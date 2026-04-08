@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BigCommerce Widget Customizations</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- JSZip: builds the ZIP entirely in the browser — credentials never stored server-side -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="header-inner">
+      <div class="header-logo">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="6" fill="#3C64F4"/>
+          <path d="M7 9h9a3 3 0 010 6H7V9z" fill="white" opacity="0.9"/>
+          <path d="M7 15h10a3 3 0 010 6H7v-6z" fill="white"/>
+        </svg>
+        <span class="header-title">BigCommerce Widget Customizations</span>
+      </div>
+      <span class="header-badge">Free to use</span>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ===================================================================== -->
+    <div id="wizard-mode" class="wizard-container">
+
+      <!-- Step progress bar -->
+      <div class="wizard-progress">
+        <div class="progress-steps">
+          <div class="progress-step active" data-step="1">
+            <div class="step-dot">1</div>
+            <span>Store Details</span>
+          </div>
+          <div class="progress-line"></div>
+          <div class="progress-step" data-step="2">
+            <div class="step-dot">2</div>
+            <span>Store Hash</span>
+          </div>
+          <div class="progress-line"></div>
+          <div class="progress-step" data-step="3">
+            <div class="step-dot">3</div>
+            <span>Access Token</span>
+          </div>
+          <div class="progress-line"></div>
+          <div class="progress-step" data-step="4">
+            <div class="step-dot">4</div>
+            <span>Download</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step panels -->
+      <div class="wizard-body">
+
+        <!-- Step 1: Store Details -->
+        <div class="wizard-step active" id="wstep-1">
+          <div class="wizard-welcome">
+            <div class="wizard-icon">🛒</div>
+            <h1>BigCommerce Widget Customizations</h1>
+            <p>This tool downloads all your store's Page Builder widget templates to your local machine so you can edit them and push changes back — no coding experience required.</p>
+            <div class="wizard-what">
+              <div class="what-item">
+                <span class="what-icon">📦</span>
+                <div><strong>Downloads</strong> all your widget templates as editable files</div>
+              </div>
+              <div class="what-item">
+                <span class="what-icon">✏️</span>
+                <div><strong>Edit</strong> HTML, schema and config locally in any editor</div>
+              </div>
+              <div class="what-item">
+                <span class="what-icon">🚀</span>
+                <div><strong>Push</strong> changes back to your live store with one command</div>
+              </div>
+            </div>
+          </div>
+          <div class="wizard-fields">
+            <div class="field-group">
+              <label for="w-store-name">Store Name <span class="req">*</span></label>
+              <input type="text" id="w-store-name" placeholder="e.g. My Outdoor Store" autocomplete="off" />
+              <span class="field-hint">A friendly label — used to name your download folder</span>
+            </div>
+            <div class="field-group">
+              <label for="w-os">Your Operating System <span class="req">*</span></label>
+              <div class="os-picker">
+                <label class="os-option">
+                  <input type="radio" name="os" value="mac" checked />
+                  <span class="os-card">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                    Mac
+                  </span>
+                </label>
+                <label class="os-option">
+                  <input type="radio" name="os" value="windows" />
+                  <span class="os-card">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.557L10.234 4.5v7.169H3V5.557zm0 12.887L10.234 19.5V12.5H3v5.944zm8.034 1.221L21 21v-8.5h-9.966v7.165zm0-14.33v7.165H21V3L11.034 5.335z"/></svg>
+                    Windows
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="wizard-actions">
+            <button class="btn-next" id="step1-next">Next: Store Hash →</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Store Hash -->
+        <div class="wizard-step" id="wstep-2">
+          <div class="step-header">
+            <h2>Your Store Hash</h2>
+            <p>The store hash is a short code that identifies your BigCommerce store. It's in your admin URL.</p>
+          </div>
+          <div class="hint-box">
+            <div class="hint-label">📍 Where to find it</div>
+            <div class="hint-url">
+              https://store-<mark>XXXXX</mark>.mybigcommerce.com/manage
+            </div>
+            <p class="hint-text">Log into your BigCommerce admin. Look at the URL in your browser — the part after <code>store-</code> and before <code>.mybigcommerce.com</code> is your store hash.</p>
+          </div>
+          <div class="wizard-fields">
+            <div class="field-group">
+              <label for="w-store-hash">Store Hash <span class="req">*</span></label>
+              <input type="text" id="w-store-hash" placeholder="e.g. abc123xyz" autocomplete="off" spellcheck="false" />
+              <span class="field-hint">Looks like a short alphanumeric string — no spaces</span>
+            </div>
+          </div>
+          <div class="wizard-actions">
+            <button class="btn-back" id="step2-back">← Back</button>
+            <button class="btn-next" id="step2-next">Next: Access Token →</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Access Token -->
+        <div class="wizard-step" id="wstep-3">
+          <div class="step-header">
+            <h2>API Access Token</h2>
+            <p>An API token lets this tool securely connect to your store. Create one in your BigCommerce admin.</p>
+          </div>
+          <div class="hint-box">
+            <div class="hint-label">🔑 How to create an API token</div>
+            <ol class="hint-steps">
+              <li>Go to your BigCommerce admin → <strong>Settings → API Accounts</strong></li>
+              <li>Click <strong>Create API Account → Create V2/V3 API Token</strong></li>
+              <li>Give it a name (e.g. <em>Widget Tool</em>)</li>
+              <li>Under <strong>OAuth Scopes</strong>, find <strong>Content</strong> and set it to <strong>Modify</strong></li>
+              <li>Click <strong>Save</strong> — copy the token shown on the next screen</li>
+            </ol>
+            <div class="hint-warn">⚠ The token is only shown once — copy it before closing the page</div>
+          </div>
+          <div class="wizard-fields">
+            <div class="field-group">
+              <label for="w-access-token">Access Token <span class="req">*</span></label>
+              <div class="token-input-wrap">
+                <input type="password" id="w-access-token" placeholder="Paste your access token here" autocomplete="off" spellcheck="false" />
+                <button class="btn-toggle-token" id="toggle-token" title="Show/hide token">
+                  <svg id="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                </button>
+              </div>
+              <span class="field-hint">Starts with a long string of letters and numbers</span>
+            </div>
+          </div>
+          <div id="wizard-error" class="wizard-error hidden"></div>
+          <div class="wizard-actions">
+            <button class="btn-back" id="step3-back">← Back</button>
+            <button class="btn-next" id="step3-connect">
+              <span id="connect-label">Connect & Fetch Widgets</span>
+              <span id="connect-spinner" class="btn-spinner hidden"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 4: Download -->
+        <div class="wizard-step" id="wstep-4">
+          <div class="success-state">
+            <div class="success-icon">✅</div>
+            <h2>Your widgets are ready!</h2>
+            <p id="success-summary">Connected successfully. Your widget templates have been fetched.</p>
+          </div>
+
+          <div class="download-card">
+            <div class="download-card-icon">📦</div>
+            <div class="download-card-info">
+              <strong id="zip-name">store-widgets.zip</strong>
+              <span id="zip-desc" class="download-card-desc"></span>
+            </div>
+            <button id="wizard-download-btn" class="btn-download">Download ZIP</button>
+          </div>
+
+          <div class="next-steps">
+            <h3>What's inside the ZIP</h3>
+            <div class="next-step-list">
+              <div class="ns-item"><code>widgets/</code> — all your widget templates (HTML, schema, config)</div>
+              <div class="ns-item"><code>.env</code> — pre-filled with your store credentials</div>
+              <div class="ns-item"><code>scripts/push.js</code> — push edits back to your store</div>
+              <div class="ns-item"><code>README.md</code> — step-by-step guide for your OS</div>
+            </div>
+            <h3 class="mt">How to push changes</h3>
+            <div id="push-instructions" class="code-block"></div>
+          </div>
+
+          <div class="help-cta">
+            <div class="help-cta-text">
+              <strong>Need help with your local setup?</strong>
+              <span>Open Claude.ai with pre-filled context about your widgets — just ask your question.</span>
+            </div>
+            <a id="claude-help-btn" class="btn-claude-help" href="#" target="_blank" rel="noopener">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+              Ask Claude
+            </a>
+          </div>
+
+          <div class="wizard-actions center">
+            <button class="btn-back btn-secondary" id="step4-restart">Start Over</button>
+          </div>
+        </div>
+
+      </div><!-- /.wizard-body -->
+    </div><!-- /#wizard-mode -->
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
