@@ -135,10 +135,10 @@ export async function createWidget(name) {
   └── widget.yml
 
   Preview locally:
-    npm run bc-widget -- dev widgets/${slug}
+    npx bcw dev widgets/${slug}
 
   Push to BigCommerce when ready:
-    npm run bc-widget -- push widgets/${slug}
+    npx bcw push widgets/${slug}
 `);
 }
 

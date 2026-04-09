@@ -31,12 +31,56 @@ function esc(str) {
     .replace(/"/g, '&quot;');
 }
 
-/** Replace {{_.data.fieldId}} with values from the data map */
+/** Render one {{#each}} item body with its own context */
+function renderEachItem(body, item, index, parentData, widgetId) {
+  // {{#if (eq ../_.data.xxx "val")}}...{{else}}...{{/if}}
+  body = body.replace(
+    /\{\{#if \(eq \.\.\/_.data\.(\w+) "([^"]+)"\)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    (_, field, val, truthy, falsy = '') =>
+      String(parentData[field] ?? '') === val ? truthy : falsy
+  );
+
+  // {{#if itemProp}}...{{else}}...{{/if}}
+  body = body.replace(
+    /\{\{#if (\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    (_, prop, truthy, falsy = '') => item[prop] ? truthy : falsy
+  );
+
+  body = body.replace(/\{\{@index\}\}/g, String(index));
+  body = body.replace(/\{\{\.\.\/_.id\}\}/g, widgetId);
+  body = body.replace(/\{\{\.\.\/_.data\.(\w+)\}\}/g, (_, k) => String(parentData[k] ?? ''));
+  body = body.replace(/\{\{(\w+)\}\}/g, (_, prop) => String(item[prop] ?? ''));
+  return body;
+}
+
+/** Replace template expressions with values from the data map */
 function renderTemplate(html, data) {
-  return html.replace(/\{\{_\.data\.([^}]+)\}\}/g, (_, key) => {
+  const widgetId = 'preview';
+
+  // {{#each _.data.xxx}}...{{/each}}
+  html = html.replace(
+    /\{\{#each _\.data\.(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g,
+    (_, key, body) => {
+      const arr = data[key];
+      if (!Array.isArray(arr) || arr.length === 0) return '';
+      return arr.map((item, i) => renderEachItem(body, item, i, data, widgetId)).join('');
+    }
+  );
+
+  // {{#if _.data.xxx}}...{{else}}...{{/if}}
+  html = html.replace(
+    /\{\{#if _\.data\.(\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    (_, key, truthy, falsy = '') => data[key] ? truthy : falsy
+  );
+
+  // {{_.id}} and {{_.data.xxx}}
+  html = html.replace(/\{\{_\.id\}\}/g, widgetId);
+  html = html.replace(/\{\{_\.data\.([^}]+)\}\}/g, (_, key) => {
     const v = data[key.trim()];
     return v !== undefined ? String(v) : '';
   });
+
+  return html;
 }
 
 /** Flatten schema tabs/sections into a flat array of settings */
@@ -109,6 +153,16 @@ function renderControl(setting, value) {
           value="${esc(val)}" min="${esc(setting.min ?? 0)}"
           max="${esc(setting.max ?? 100)}" step="${esc(setting.step ?? 1)}">
       </div>`;
+
+    case 'array': {
+      const count = Array.isArray(val) ? val.length : 0;
+      return `<div class="ctrl-row">
+        ${label}
+        <div style="font-size:12px;color:var(--soft);padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;">
+          ${count} item${count !== 1 ? 's' : ''} — edit <code style="font-size:11px">config.json</code> to modify
+        </div>
+      </div>`;
+    }
 
     default: // input / text
       return `<div class="ctrl-row">
@@ -422,7 +476,7 @@ iframe#preview-frame {
 </div>
 
 <script>
-const INITIAL_HTML = ${JSON.stringify(rendered)};
+const INITIAL_HTML = ${JSON.stringify(rendered).replace(/<\/(script)/gi, '<\\/$1')};
 
 function makeDoc(html) {
   return '<!DOCTYPE html><html><head><meta charset="UTF-8">'

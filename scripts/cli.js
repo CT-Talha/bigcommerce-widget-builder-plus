@@ -1,9 +1,10 @@
+#!/usr/bin/env node
 /**
  * BigCommerce Widget CLI — unified entry point
  *
  * Usage:
- *   npm run bc-widget -- <command> [args]
- *   npm run bc-widget -- -h
+ *   npx bcw <command> [args]
+ *   npx bcw -h
  */
 
 import { fileURLToPath } from 'node:url';
@@ -19,19 +20,28 @@ const HELP = `
   ╚══════════════════════════════════════════════════╝
 
   Usage:
-    npm run bc-widget -- <command> [args]
+    npx bcw <command> [args]
 
   Commands:
+    list                     List all widgets in your store (with numbers)
     create <name>            Scaffold a new widget with starter files
     dev    <widget-folder>   Start live preview server with schema controls
     push   <widget-folder>   Push a widget to your BigCommerce store
-    download                 Download all widgets from your store
+    delete <widget-folder>   Delete a widget from your BigCommerce store
+    download                 Download all widgets
+    download --all           Download all widgets (explicit)
+    download "<name>"        Download one widget by name (partial match ok)
+    download <number>        Download one widget by number from list
 
   Examples:
-    npm run bc-widget -- create my-banner
-    npm run bc-widget -- dev widgets/my-banner
-    npm run bc-widget -- push widgets/my-banner
-    npm run bc-widget -- download
+    npx bcw list
+    npx bcw create my-banner
+    npx bcw dev widgets/my-banner
+    npx bcw push widgets/my-banner
+    npx bcw delete widgets/my-banner
+    npx bcw download
+    npx bcw download "My Banner"
+    npx bcw download 2
 
   Options:
     -h, --help               Show this help message
@@ -73,6 +83,23 @@ async function run() {
       }
       const { startDev } = await import('./dev.js');
       await startDev(args[0]);
+      break;
+    }
+
+    case 'list': {
+      const { fetchTemplates, printTable } = await import('./list.js');
+      const templates = await fetchTemplates();
+      printTable(templates);
+      break;
+    }
+
+    case 'delete': {
+      if (!args[0]) {
+        console.error('\n  Error: widget folder is required.');
+        console.error('  Example: npx bcw delete widgets/my-banner\n');
+        process.exit(1);
+      }
+      spawnScript('delete.js', args);
       break;
     }
 

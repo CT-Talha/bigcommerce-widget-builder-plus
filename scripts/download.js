@@ -1,9 +1,11 @@
 /**
- * Download all widget templates from BigCommerce store
- * and write them as local Widget Builder projects.
+ * Download widget templates from BigCommerce store.
  *
  * Usage:
- *   node scripts/download.js
+ *   node scripts/download.js             — download all
+ *   node scripts/download.js --all       — download all (explicit)
+ *   node scripts/download.js "My Banner" — download by name (partial match)
+ *   node scripts/download.js 2           — download by list number
  *
  * Output:
  *   widgets/<widget-name>/
@@ -15,27 +17,9 @@
 
 import fs from 'fs';
 import path from 'path';
+import { loadEnv } from './env.js';
 
-// ---------------------------------------------------------------------------
-// Config — load from .env manually (no dotenv dependency needed)
-// ---------------------------------------------------------------------------
-function loadEnv() {
-  const envPath = path.resolve(process.cwd(), '.env');
-  if (!fs.existsSync(envPath)) {
-    console.error('ERROR: .env file not found.');
-    console.error('Copy .env.example to .env and fill in your credentials.');
-    process.exit(1);
-  }
-  const lines = fs.readFileSync(envPath, 'utf8').split('\n');
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const [key, ...rest] = trimmed.split('=');
-    process.env[key.trim()] = rest.join('=').trim();
-  }
-}
-
-loadEnv();
+await loadEnv();
 
 const STORE_HASH = process.env.BC_STORE_HASH;
 const ACCESS_TOKEN = process.env.BC_ACCESS_TOKEN;
@@ -79,6 +63,39 @@ async function fetchTemplates() {
   }
 
   return templates;
+}
+
+// ---------------------------------------------------------------------------
+// Filter templates based on CLI argument
+// ---------------------------------------------------------------------------
+function filterTemplates(templates, arg) {
+  // No arg or --all → download everything
+  if (!arg || arg === '--all') return templates;
+
+  // Numeric arg → pick by 1-based index
+  const num = Number(arg);
+  if (Number.isInteger(num) && num >= 1 && num <= templates.length) {
+    return [templates[num - 1]];
+  }
+
+  // String arg → case-insensitive partial name match
+  const query = arg.toLowerCase();
+  const matches = templates.filter(t => t.name.toLowerCase().includes(query));
+
+  if (!matches.length) {
+    console.error(`\nNo widget found matching: "${arg}"`);
+    console.error('Run "npm run bc-widget -- list" to see all available widgets.\n');
+    process.exit(1);
+  }
+
+  if (matches.length > 1) {
+    console.log(`\nMultiple widgets match "${arg}":`);
+    matches.forEach((t, i) => console.log(`  ${i + 1}. ${t.name}`));
+    console.log('\nBe more specific or use the exact name.\n');
+    process.exit(1);
+  }
+
+  return matches;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,18 +186,22 @@ function writeWidget(template, widgetsDir) {
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
+  const arg = process.argv[2]; // optional: name, number, or --all
   const widgetsDir = path.resolve(process.cwd(), 'widgets');
   fs.mkdirSync(widgetsDir, { recursive: true });
 
-  console.log('Fetching widget templates from BigCommerce...\n');
-  const templates = await fetchTemplates();
+  console.log('\nFetching widget list from BigCommerce...');
+  const allTemplates = await fetchTemplates();
 
-  if (templates.length === 0) {
-    console.log('No widget templates found in this store.');
+  if (allTemplates.length === 0) {
+    console.log('No widget templates found in this store.\n');
     return;
   }
 
-  console.log(`Found ${templates.length} widget template(s):\n`);
+  const templates = filterTemplates(allTemplates, arg);
+  const downloadingAll = !arg || arg === '--all';
+
+  console.log(`\nDownloading ${downloadingAll ? 'all' : ''} ${templates.length} widget template${templates.length === 1 ? '' : 's'}:\n`);
 
   for (const template of templates) {
     const dir = writeWidget(template, widgetsDir);
@@ -189,7 +210,8 @@ async function main() {
     console.log(`     Path : ${path.relative(process.cwd(), dir)}\n`);
   }
 
-  console.log('Done. Edit files inside widgets/ then run: node scripts/push.js <widget-folder>');
+  console.log(`Done. Edit files inside widgets/ then run:`);
+  console.log(`  npm run bc-widget -- push widgets/<widget-folder>\n`);
 }
 
 main().catch((err) => {

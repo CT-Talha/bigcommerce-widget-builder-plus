@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "description": "BigCommerce Widget Customizations — download, edit and push widgets",
   "type": "module",
+  "bin": {
+    "bcw": "./scripts/cli.js"
+  },
   "scripts": {
-    "start": "node server.js",
-    "bc-widget": "node scripts/cli.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.19.2"
