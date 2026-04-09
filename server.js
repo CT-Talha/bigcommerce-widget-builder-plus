@@ -6,7 +6,7 @@
  * Every request is fire-and-forget — nothing touches disk or RAM between requests.
  *
  * Start: node server.js
- * Open:  http://localhost:3000
+ * Open:  http://localhost:4040
  */
 
 import express from 'express';
@@ -88,7 +88,7 @@ app.get('/api/scripts/:name', (req, res) => {
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4040;
 app.listen(PORT, () => {
   console.log(`\n  BigCommerce Widget Customizations`);
   console.log(`  Running at http://localhost:${PORT}`);

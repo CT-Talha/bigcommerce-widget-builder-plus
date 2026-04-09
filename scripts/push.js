@@ -118,22 +118,22 @@ function readWidget(widgetDir) {
   }
 
   const yml = parseWidgetYml(fs.readFileSync(ymlPath, 'utf8'));
-  if (!yml.template_uuid) {
-    console.error('ERROR: widget.yml is missing template_uuid. Was this widget downloaded with download.js?');
-    process.exit(1);
-  }
-
   const template = fs.readFileSync(htmlPath, 'utf8');
   const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
 
-  return { name: yml.name, uuid: yml.template_uuid, template, schema };
+  // template_uuid is empty for brand-new widgets created with create.js
+  // push.js will POST to create them and write the UUID back to widget.yml
+  return { name: yml.name, uuid: yml.template_uuid || '', template, schema, ymlPath };
 }
 
 // ---------------------------------------------------------------------------
-// Push to BigCommerce
+// Push to BigCommerce — POST (new) or PUT (existing)
 // ---------------------------------------------------------------------------
 async function pushWidget(widget) {
-  const url = `${BASE_URL}/widget-templates/${widget.uuid}`;
+  const isNew = !widget.uuid;
+  const url = isNew
+    ? `${BASE_URL}/widget-templates`
+    : `${BASE_URL}/widget-templates/${widget.uuid}`;
 
   const body = {
     name: widget.name,
@@ -142,7 +142,7 @@ async function pushWidget(widget) {
   };
 
   const res = await fetch(url, {
-    method: 'PUT',
+    method: isNew ? 'POST' : 'PUT',
     headers: HEADERS,
     body: JSON.stringify(body),
   });
@@ -155,7 +155,7 @@ async function pushWidget(widget) {
     process.exit(1);
   }
 
-  return json.data;
+  return { data: json.data, isNew };
 }
 
 // ---------------------------------------------------------------------------
@@ -169,25 +169,24 @@ async function main() {
   const widget = readWidget(widgetDir);
 
   console.log(`Widget  : ${widget.name}`);
-  console.log(`UUID    : ${widget.uuid}`);
-  console.log(`\nPushing to BigCommerce...`);
+  console.log(`UUID    : ${widget.uuid || '(new — will be assigned by BigCommerce)'}`);
+  console.log(`\n${widget.uuid ? 'Updating' : 'Creating'} widget on BigCommerce...`);
 
-  const updated = await pushWidget(widget);
+  const { data: updated, isNew } = await pushWidget(widget);
 
-  console.log(`\nSuccess! Template updated.`);
+  console.log(`\nSuccess! Widget ${isNew ? 'created' : 'updated'}.`);
   console.log(`  Name    : ${updated.name}`);
   console.log(`  UUID    : ${updated.uuid}`);
   console.log(`  Version : ${updated.version_uuid ?? 'n/a'}`);
 
-  // Update version_uuid in widget.yml if it changed
-  const ymlPath = path.join(widgetDir, 'widget.yml');
+  // Always write UUID + version back to widget.yml
   const newYml = [
     `name: "${updated.name}"`,
     `template_uuid: "${updated.uuid}"`,
     `version_uuid: "${updated.version_uuid ?? ''}"`,
   ].join('\n') + '\n';
-  fs.writeFileSync(ymlPath, newYml, 'utf8');
-  console.log(`\nwidget.yml updated with new version_uuid.`);
+  fs.writeFileSync(widget.ymlPath, newYml, 'utf8');
+  console.log(`\nwidget.yml updated${isNew ? ' with new UUID' : ' with new version_uuid'}.`);
 }
 
 main().catch((err) => {
