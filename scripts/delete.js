@@ -98,6 +98,13 @@ const res = await fetch(`${BASE_URL}/widget-templates/${uuid}`, {
 if (res.status === 204 || res.ok) {
   // 204 No Content is the success response for DELETE
   console.log(`\n  ✓  Widget deleted from BigCommerce.`);
+
+  // Clear the UUID from widget.yml so the next push creates a fresh widget
+  const updatedYml = fs.readFileSync(ymlPath, 'utf8')
+    .replace(/^template_uuid:.*$/m, 'template_uuid: ""')
+    .replace(/^version_uuid:.*$/m, 'version_uuid: ""');
+  fs.writeFileSync(ymlPath, updatedYml, 'utf8');
+  console.log(`  ✓  Cleared UUID from widget.yml — next push will create a new widget.`);
   console.log(`  The local folder (${path.relative(process.cwd(), widgetDir)}) was NOT removed.\n`);
 } else {
   const body = await res.json().catch(() => ({}));

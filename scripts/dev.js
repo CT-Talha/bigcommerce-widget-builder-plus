@@ -33,23 +33,36 @@ function esc(str) {
 
 /** Render one {{#each}} item body with its own context */
 function renderEachItem(body, item, index, parentData, widgetId) {
-  // {{#if (eq ../_.data.xxx "val")}}...{{else}}...{{/if}}
+  // {{#if ../field '===' 'value'}} — parent context equality
   body = body.replace(
-    /\{\{#if \(eq \.\.\/_.data\.(\w+) "([^"]+)"\)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
-    (_, field, val, truthy, falsy = '') =>
-      String(parentData[field] ?? '') === val ? truthy : falsy
+    /\{\{#if\s+\.\.\/(\w+)\s+'==='\s+'([^']+)'\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    (_, k, val, truthy, falsy = '') => String(parentData[k] ?? '') === val ? truthy : falsy
   );
-
-  // {{#if itemProp}}...{{else}}...{{/if}}
+  // {{#if field '===' 'value'}} — item context equality
   body = body.replace(
-    /\{\{#if (\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
-    (_, prop, truthy, falsy = '') => item[prop] ? truthy : falsy
+    /\{\{#if\s+(\w+)\s+'==='\s+'([^']+)'\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    (_, k, val, truthy, falsy = '') => String(item[k] ?? '') === val ? truthy : falsy
   );
-
+  // {{#if ../field}} — parent truthy
+  body = body.replace(
+    /\{\{#if\s+\.\.\/(\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    (_, k, truthy, falsy = '') => parentData[k] ? truthy : falsy
+  );
+  // {{#if field}} — item truthy
+  body = body.replace(
+    /\{\{#if\s+(\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    (_, k, truthy, falsy = '') => item[k] ? truthy : falsy
+  );
   body = body.replace(/\{\{@index\}\}/g, String(index));
-  body = body.replace(/\{\{\.\.\/_.id\}\}/g, widgetId);
-  body = body.replace(/\{\{\.\.\/_.data\.(\w+)\}\}/g, (_, k) => String(parentData[k] ?? ''));
-  body = body.replace(/\{\{(\w+)\}\}/g, (_, prop) => String(item[prop] ?? ''));
+  body = body.replace(/\{\{\.\.\/_\.id\}\}/g, widgetId);
+  body = body.replace(/\{\{_\.id\}\}/g, widgetId);
+  // {{../_.data.field}} and {{_.data.field}} — legacy
+  body = body.replace(/\{\{\.\.\/_\.data\.(\w+)\}\}/g, (_, k) => String(parentData[k] ?? ''));
+  body = body.replace(/\{\{_\.data\.(\w+)\}\}/g, (_, k) => String(parentData[k] ?? ''));
+  // {{../field}} — parent direct access
+  body = body.replace(/\{\{\.\.\/(\w+)\}\}/g, (_, k) => String(parentData[k] ?? ''));
+  // {{field}} — item direct access
+  body = body.replace(/\{\{(\w+)\}\}/g, (_, k) => String(item[k] ?? ''));
   return body;
 }
 
@@ -57,9 +70,9 @@ function renderEachItem(body, item, index, parentData, widgetId) {
 function renderTemplate(html, data) {
   const widgetId = 'preview';
 
-  // {{#each _.data.xxx}}...{{/each}}
+  // {{#each field}} and {{#each _.data.field}} — both patterns
   html = html.replace(
-    /\{\{#each _\.data\.(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g,
+    /\{\{#each\s+(?:_\.data\.)?(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g,
     (_, key, body) => {
       const arr = data[key];
       if (!Array.isArray(arr) || arr.length === 0) return '';
@@ -67,39 +80,79 @@ function renderTemplate(html, data) {
     }
   );
 
-  // {{#if _.data.xxx}}...{{else}}...{{/if}}
+  // {{#if field '===' 'value'}} — equality
   html = html.replace(
-    /\{\{#if _\.data\.(\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    /\{\{#if\s+(\w+)\s+'==='\s+'([^']+)'\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    (_, key, val, truthy, falsy = '') => String(data[key] ?? '') === val ? truthy : falsy
+  );
+
+  // {{#if _.data.field}} and {{#if field}} — truthy check
+  html = html.replace(
+    /\{\{#if\s+(?:_\.data\.)?(\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
     (_, key, truthy, falsy = '') => data[key] ? truthy : falsy
   );
 
-  // {{_.id}} and {{_.data.xxx}}
+  // {{_.id}}
   html = html.replace(/\{\{_\.id\}\}/g, widgetId);
+
+  // {{_.data.field}} — legacy
   html = html.replace(/\{\{_\.data\.([^}]+)\}\}/g, (_, key) => {
     const v = data[key.trim()];
     return v !== undefined ? String(v) : '';
   });
 
+  // {{field}} — direct access (must be last)
+  html = html.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    return data[key] !== undefined ? String(data[key]) : '';
+  });
+
   return html;
 }
 
-/** Flatten schema tabs/sections into a flat array of settings */
+/** Flatten schema into a flat array of settings — handles array + tab at root */
 function flattenSettings(schema) {
   const out = [];
-  for (const tab of (schema ?? [])) {
-    if (tab.settings) out.push(...tab.settings);
-    for (const section of (tab.sections ?? [])) {
-      if (section.settings) out.push(...section.settings);
+  for (const item of (schema ?? [])) {
+    if (item.type === 'array') {
+      out.push(item); // keep array itself for renderControl
+      for (const inner of (item.schema ?? [])) {
+        if (inner.settings) out.push(...inner.settings);
+        for (const section of (inner.sections ?? [])) {
+          if (section.settings) out.push(...section.settings);
+        }
+      }
+    } else if (item.type === 'tab') {
+      for (const section of (item.sections ?? [])) {
+        if (section.settings) out.push(...section.settings);
+      }
+    } else if (item.id) {
+      out.push(item); // direct setting at root level
     }
   }
   return out;
 }
 
-/** Build default values map from schema settings */
+/** Build default values map from schema — arrays become arrays of default items */
 function defaultsFromSchema(schema) {
   const out = {};
   for (const s of flattenSettings(schema)) {
-    if (s.id !== undefined) out[s.id] = s.default ?? '';
+    if (s.type === 'array') {
+      if (out[s.id] === undefined) {
+        const itemDefaults = {};
+        for (const inner of (s.schema ?? [])) {
+          const settings = inner.settings
+            ?? (inner.sections ?? []).flatMap(sec => sec.settings ?? [])
+            ?? [];
+          for (const f of settings) {
+            if (f.id) itemDefaults[f.id] = f.default ?? '';
+          }
+          if (inner.id) itemDefaults[inner.id] = inner.default ?? '';
+        }
+        out[s.id] = Array.from({ length: s.defaultCount ?? 1 }, () => ({ ...itemDefaults }));
+      }
+    } else if (s.id !== undefined) {
+      out[s.id] = s.default ?? '';
+    }
   }
   return out;
 }
@@ -143,16 +196,19 @@ function renderControl(setting, value) {
         <input type="number" id="${id}" data-id="${esc(setting.id)}" value="${esc(val)}">
       </div>`;
 
-    case 'range':
+    case 'range': {
+      const rv = setting.typeMeta?.rangeValues ?? {};
+      const unit = rv.unit ?? '';
       return `<div class="ctrl-row">
         <div class="range-label-row">
           ${label}
-          <span class="range-val" data-for="${esc(setting.id)}">${esc(val)}</span>
+          <span class="range-val" data-for="${esc(setting.id)}">${esc(val)}${esc(unit)}</span>
         </div>
         <input type="range" id="${id}" data-id="${esc(setting.id)}"
-          value="${esc(val)}" min="${esc(setting.min ?? 0)}"
-          max="${esc(setting.max ?? 100)}" step="${esc(setting.step ?? 1)}">
+          value="${esc(val)}" min="${esc(rv.min ?? 0)}"
+          max="${esc(rv.max ?? 100)}" step="${esc(rv.step ?? 1)}">
       </div>`;
+    }
 
     case 'array': {
       const count = Array.isArray(val) ? val.length : 0;
@@ -164,6 +220,15 @@ function renderControl(setting, value) {
       </div>`;
     }
 
+    case 'visibility':
+      return `<div class="ctrl-row ctrl-row--inline">
+        ${label}
+        <select id="${id}" data-id="${esc(setting.id)}">
+          <option value="show" ${val === 'show' ? 'selected' : ''}>Show</option>
+          <option value="hide" ${val === 'hide' ? 'selected' : ''}>Hide</option>
+        </select>
+      </div>`;
+
     default: // input / text
       return `<div class="ctrl-row">
         ${label}
@@ -172,17 +237,22 @@ function renderControl(setting, value) {
   }
 }
 
-/** Render all schema controls as HTML (tabs → sections → settings) */
+/** Render all schema controls as HTML — handles array + tab at root level */
 function renderControls(schema, values) {
   if (!schema?.length) {
     return '<div class="no-schema">No schema.json found.<br>Add settings to see controls here.</div>';
   }
 
   let out = '';
-  for (const tab of schema) {
-    out += `<div class="tab-label">${esc(tab.label ?? '')}</div>`;
-    if (tab.sections) {
-      for (const section of tab.sections) {
+  for (const item of schema) {
+    if (item.type === 'array') {
+      // Show array as a simple item count (items edited via config.json in preview)
+      out += `<div class="tab-label">${esc(item.label ?? 'Items')}</div>`;
+      out += `<div class="section">${renderControl(item, values[item.id])}</div>`;
+
+    } else if (item.type === 'tab') {
+      out += `<div class="tab-label">${esc(item.label ?? '')}</div>`;
+      for (const section of (item.sections ?? [])) {
         out += `<div class="section">`;
         if (section.label) out += `<div class="section-label">${esc(section.label)}</div>`;
         for (const s of (section.settings ?? [])) {
@@ -190,11 +260,10 @@ function renderControls(schema, values) {
         }
         out += `</div>`;
       }
-    }
-    if (tab.settings) {
-      out += `<div class="section">`;
-      for (const s of tab.settings) out += renderControl(s, values[s.id]);
-      out += `</div>`;
+
+    } else if (item.id) {
+      // Direct root-level setting (no tab wrapper)
+      out += `<div class="section">${renderControl(item, values[item.id])}</div>`;
     }
   }
   return out;
@@ -430,11 +499,11 @@ html, body { height: 100%; font-family: var(--font); background: var(--bg); colo
 .widget-card {
   background: var(--white); border-radius: 10px;
   box-shadow: 0 2px 16px rgba(0,0,0,0.07);
-  overflow: hidden; min-height: 80px;
+  overflow: visible; min-height: 80px;
 }
 iframe#preview-frame {
   display: block; width: 100%; border: none;
-  min-height: 120px;
+  min-height: 90vh; overflow: hidden;
 }
 </style>
 </head>
@@ -480,21 +549,28 @@ const INITIAL_HTML = ${JSON.stringify(rendered).replace(/<\/(script)/gi, '<\\/$1
 
 function makeDoc(html) {
   return '<!DOCTYPE html><html><head><meta charset="UTF-8">'
-    + '<style>*{box-sizing:border-box}body{margin:0;padding:0;font-family:sans-serif}</style>'
+    + '<style>*{box-sizing:border-box}html,body{margin:0;padding:0;overflow:visible;height:auto}body{padding:16px;font-family:sans-serif}</style>'
+    + '<script>'
+    + 'function notifyHeight(){'
+    +   'window.parent.postMessage({type:"bcw-resize",h:document.body.scrollHeight},"*");'
+    + '}'
+    + 'new ResizeObserver(notifyHeight).observe(document.body);'
+    + 'document.addEventListener("click",function(){setTimeout(notifyHeight,350)});'
+    + '<\\/script>'
     + '</head><body>' + html + '</body></html>';
 }
 
 const frame = document.getElementById('preview-frame');
 
+// Listen for height updates from inside the iframe
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'bcw-resize' && e.data.h > 0) {
+    frame.style.height = e.data.h + 'px';
+  }
+});
+
 function setPreview(html) {
   frame.srcdoc = makeDoc(html);
-  // Auto-resize iframe to content height
-  frame.onload = () => {
-    try {
-      const h = frame.contentDocument.body.scrollHeight;
-      if (h > 0) frame.style.height = h + 'px';
-    } catch {}
-  };
 }
 
 setPreview(INITIAL_HTML);
@@ -527,7 +603,12 @@ function wireControls() {
       el.addEventListener('input', e => {
         const v = e.target.value;
         const span = document.querySelector('.range-val[data-for="' + el.dataset.id + '"]');
-        if (span) span.textContent = v;
+        if (span) {
+          // preserve any unit suffix (px, em, %) that was in the original label
+          const orig = span.textContent;
+          const unit = orig.replace(/[\d.]/g, '');
+          span.textContent = v + unit;
+        }
         update(el.dataset.id, v);
       });
 
