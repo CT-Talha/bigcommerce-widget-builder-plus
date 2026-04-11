@@ -85,9 +85,9 @@ export function printTable(templates) {
     console.log(`  ${num}  ${name}  ${t.uuid}`);
   });
 
-  console.log(`\n  Download one:  npm run bc-widget -- download "<name>"`);
-  console.log(`  Download one:  npm run bc-widget -- download <number>`);
-  console.log(`  Download all:  npm run bc-widget -- download --all\n`);
+  console.log(`\n  Download one:  npx bcw download "<name>"`);
+  console.log(`  Download one:  npx bcw download <number>`);
+  console.log(`  Download all:  npx bcw download --all\n`);
 }
 
 // ── Standalone ───────────────────────────────────────────────────────────────

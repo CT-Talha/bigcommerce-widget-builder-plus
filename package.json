@@ -7,7 +7,8 @@
     "bcw": "./scripts/cli.js"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "node scripts/postinstall.js"
   },
   "dependencies": {
     "express": "^4.19.2"

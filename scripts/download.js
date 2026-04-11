@@ -84,7 +84,7 @@ function filterTemplates(templates, arg) {
 
   if (!matches.length) {
     console.error(`\nNo widget found matching: "${arg}"`);
-    console.error('Run "npm run bc-widget -- list" to see all available widgets.\n');
+    console.error('Run "npx bcw list" to see all available widgets.\n');
     process.exit(1);
   }
 
@@ -211,7 +211,7 @@ async function main() {
   }
 
   console.log(`Done. Edit files inside widgets/ then run:`);
-  console.log(`  npm run bc-widget -- push widgets/<widget-folder>\n`);
+  console.log(`  npx bcw push widgets/<widget-folder>\n`);
 }
 
 main().catch((err) => {

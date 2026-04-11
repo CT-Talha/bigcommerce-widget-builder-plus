@@ -114,7 +114,7 @@ async function run() {
     }
 
     case 'download': {
-      spawnScript('download.js', []);
+      spawnScript('download.js', args);
       break;
     }
 
