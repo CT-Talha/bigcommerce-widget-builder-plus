@@ -1,4 +1,4 @@
-# BigCommerce Widget Fetch
+# BigCommerce Widget Builder Plus
 
 A web-based tool and developer CLI for downloading, creating, previewing, and managing BigCommerce widget templates. Built for agency teams — the web UI requires no technical knowledge, while the CLI gives developers a full local workflow.
 
