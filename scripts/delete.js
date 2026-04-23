@@ -28,12 +28,15 @@ const HEADERS      = { 'X-Auth-Token': ACCESS_TOKEN, Accept: 'application/json' 
 // ── Resolve widget directory ─────────────────────────────────────────────────
 function resolveWidgetDir(arg) {
   if (!arg) {
-    console.error('\n  Usage: npx bcw delete widgets/<widget-folder>\n');
+    console.error('\n  Usage: npx bcw delete <widget-folder>\n');
     process.exit(1);
   }
+  const cwd = process.cwd();
+  // Strip legacy "widgets/" prefix if someone passes it
+  const stripped = arg.replace(/^widgets[\\/]/, '');
   const candidates = [
-    path.resolve(process.cwd(), arg),
-    path.resolve(process.cwd(), 'widgets', arg),
+    path.resolve(cwd, stripped),
+    path.resolve(cwd, arg),
   ];
   for (const c of candidates) {
     if (fs.existsSync(c) && fs.statSync(c).isDirectory()) return c;

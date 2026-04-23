@@ -2,10 +2,10 @@
  * BigCommerce Widget — Local Preview Server
  *
  * Usage (via CLI):
- *   npm run bc-widget -- dev widgets/my-banner
+ *   npx bcw dev my-banner
  *
  * Usage (standalone):
- *   node scripts/dev.js widgets/my-banner
+ *   node scripts/dev.js my-banner
  *
  * Opens a preview at http://localhost:4041 with:
  *   • Live Page Builder-style controls (generated from schema.json)
@@ -33,15 +33,23 @@ function esc(str) {
 
 /** Render one {{#each}} item body with its own context */
 function renderEachItem(body, item, index, parentData, widgetId) {
-  // {{#if ../field '===' 'value'}} — parent context equality
+  // {{#if ../field '===' 'value'}} or '===' true/false — parent context equality
   body = body.replace(
-    /\{\{#if\s+\.\.\/(\w+)\s+'==='\s+'([^']+)'\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
-    (_, k, val, truthy, falsy = '') => String(parentData[k] ?? '') === val ? truthy : falsy
+    /\{\{#if\s+\.\.\/(\w+)\s+'==='\s+(?:'([^']*)'|(true|false))\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    (_, k, quotedVal, boolVal, truthy, falsy = '') => {
+      const actual   = String(parentData[k] ?? '');
+      const expected = quotedVal !== undefined ? quotedVal : boolVal;
+      return actual === expected ? truthy : falsy;
+    }
   );
-  // {{#if field '===' 'value'}} — item context equality
+  // {{#if field '===' 'value'}} or {{#if field '===' true/false}} — item context equality
   body = body.replace(
-    /\{\{#if\s+(\w+)\s+'==='\s+'([^']+)'\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
-    (_, k, val, truthy, falsy = '') => String(item[k] ?? '') === val ? truthy : falsy
+    /\{\{#if\s+(\w+)\s+'==='\s+(?:'([^']*)'|(true|false))\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    (_, k, quotedVal, boolVal, truthy, falsy = '') => {
+      const actual   = String(item[k] ?? parentData[k] ?? '');
+      const expected = quotedVal !== undefined ? quotedVal : boolVal;
+      return actual === expected ? truthy : falsy;
+    }
   );
   // {{#if ../field}} — parent truthy
   body = body.replace(
@@ -61,8 +69,8 @@ function renderEachItem(body, item, index, parentData, widgetId) {
   body = body.replace(/\{\{_\.data\.(\w+)\}\}/g, (_, k) => String(parentData[k] ?? ''));
   // {{../field}} — parent direct access
   body = body.replace(/\{\{\.\.\/(\w+)\}\}/g, (_, k) => String(parentData[k] ?? ''));
-  // {{field}} — item direct access
-  body = body.replace(/\{\{(\w+)\}\}/g, (_, k) => String(item[k] ?? ''));
+  // {{field}} — item direct access with fallback to parent data
+  body = body.replace(/\{\{(\w+)\}\}/g, (_, k) => String(item[k] ?? parentData[k] ?? ''));
   return body;
 }
 
@@ -80,10 +88,14 @@ function renderTemplate(html, data) {
     }
   );
 
-  // {{#if field '===' 'value'}} — equality
+  // {{#if field '===' 'value'}} or {{#if field '===' true/false}} — equality
   html = html.replace(
-    /\{\{#if\s+(\w+)\s+'==='\s+'([^']+)'\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
-    (_, key, val, truthy, falsy = '') => String(data[key] ?? '') === val ? truthy : falsy
+    /\{\{#if\s+(\w+)\s+'==='\s+(?:'([^']*)'|(true|false))\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
+    (_, key, quotedVal, boolVal, truthy, falsy = '') => {
+      const actual   = String(data[key] ?? '');
+      const expected = quotedVal !== undefined ? quotedVal : boolVal;
+      return actual === expected ? truthy : falsy;
+    }
   );
 
   // {{#if _.data.field}} and {{#if field}} — truthy check
@@ -180,6 +192,24 @@ function renderControl(setting, value) {
         <input type="checkbox" id="${id}" data-id="${esc(setting.id)}" ${val ? 'checked' : ''}>
       </div>`;
 
+    case 'boolean':
+      return `<div class="ctrl-row ctrl-row--inline">
+        ${label}
+        <select id="${id}" data-id="${esc(setting.id)}">
+          <option value="true"  ${String(val) === 'true'  ? 'selected' : ''}>Yes</option>
+          <option value="false" ${String(val) === 'false' ? 'selected' : ''}>No</option>
+        </select>
+      </div>`;
+
+    case 'imageManager': {
+      const src = (val && typeof val === 'object') ? (val.src ?? '') : String(val ?? '');
+      return `<div class="ctrl-row">
+        ${label}
+        <input type="text" id="${id}" data-id="${esc(setting.id)}"
+          value="${esc(src)}" placeholder="Paste image URL">
+      </div>`;
+    }
+
     case 'select': {
       const opts = (setting.options ?? [])
         .map(o => `<option value="${esc(o.value)}" ${String(val) === String(o.value) ? 'selected' : ''}>${esc(o.label)}</option>`)
@@ -246,9 +276,29 @@ function renderControls(schema, values) {
   let out = '';
   for (const item of schema) {
     if (item.type === 'array') {
-      // Show array as a simple item count (items edited via config.json in preview)
       out += `<div class="tab-label">${esc(item.label ?? 'Items')}</div>`;
-      out += `<div class="section">${renderControl(item, values[item.id])}</div>`;
+      out += `<div class="section">`;
+
+      // Array item count
+      const count = Array.isArray(values[item.id]) ? values[item.id].length : 0;
+      out += `<div class="ctrl-row"><div style="font-size:12px;color:var(--soft);padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-bottom:8px;">
+        ${count} item${count !== 1 ? 's' : ''} — edit <code style="font-size:11px">config.json</code> to add/remove
+      </div></div>`;
+
+      // Render inner settings (from the first item) so they're controllable in preview
+      const firstItem = Array.isArray(values[item.id]) ? (values[item.id][0] ?? {}) : {};
+      for (const inner of (item.schema ?? [])) {
+        for (const section of (inner.sections ?? [])) {
+          if (section.label) out += `<div class="section-label">${esc(section.label)}</div>`;
+          for (const s of (section.settings ?? [])) {
+            if (s.type === 'imageManager') continue; // image picker — skip in preview
+            const val = firstItem[s.id] ?? values[s.id] ?? s.default ?? '';
+            out += renderControl(s, val);
+          }
+        }
+      }
+
+      out += `</div>`;
 
     } else if (item.type === 'tab') {
       out += `<div class="tab-label">${esc(item.label ?? '')}</div>`;
@@ -349,6 +399,17 @@ export async function startDev(widgetFolder) {
   app.post('/update', (req, res) => {
     const { id, value } = req.body;
     liveValues[id] = value;
+    // Also push the updated value into every array item that has this field,
+    // so inner-array controls (e.g. per-slide settings) reflect instantly
+    for (const arr of Object.values(liveValues)) {
+      if (Array.isArray(arr)) {
+        for (const item of arr) {
+          if (typeof item === 'object' && item !== null && id in item) {
+            item[id] = value;
+          }
+        }
+      }
+    }
     const rendered = renderTemplate(getTemplate(), liveValues);
     res.json({ html: rendered });
   });

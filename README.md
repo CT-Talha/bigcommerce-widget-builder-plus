@@ -1,6 +1,6 @@
-# BigCommerce Widget Builder Plus
+# BigCommerce Widget Builder
 
-A web-based tool and developer CLI for downloading, creating, previewing, and managing BigCommerce widget templates. Built for agency teams — the web UI requires no technical knowledge, while the CLI gives developers a full local workflow.
+A web-based tool and developer CLI for downloading, creating, previewing, and managing BigCommerce widget templates. Built for agency teams — the web UI requires no technical knowledge, while the CLI gives developers a full local workflow with live preview.
 
 ---
 
@@ -8,49 +8,63 @@ A web-based tool and developer CLI for downloading, creating, previewing, and ma
 
 - **Web UI** — download all store widgets as a ZIP with one click (no setup needed)
 - **Developer CLI (`npx bcw`)** — create, preview, push, and delete widgets from the terminal
+- **Multi-client support** — one installation, one folder per client store
 - **Live preview server** — render widgets locally with real-time Page Builder-style controls
 - **Auto-reload** — edit `widget.html`, `schema.json`, or `config.json` and the preview updates instantly
-- **First-run setup** — automatically prompts for credentials on first use and saves them to `.env`
+- **Duplicate protection** — push detects existing widgets by name, never creates duplicates
 
 ---
 
 ## Project Structure
 
 ```
-bigcommerce-widget-fetch/
+bigcommerce-widget-builder/
   server.js              ← Web UI proxy server (port 4040)
   package.json
-  .env                   ← Auto-created on first CLI use (credentials)
-
   scripts/
     cli.js               ← CLI entry point (npx bcw)
+    init.js              ← Create a new client folder
     create.js            ← Scaffold a new widget
     dev.js               ← Live preview server (port 4041)
     push.js              ← Push widget to BigCommerce
     delete.js            ← Delete widget from BigCommerce
     download.js          ← Download widgets from store
     list.js              ← List all store widgets
-    env.js               ← Shared credential loader
+    env.js               ← Credential loader (walks up directory tree)
+    pack.js              ← Create distributable zip (npm run zip)
 
-  widgets/
-    <widget-name>/
-      widget.html        ← Template markup (BigCommerce Handlebars)
-      schema.json        ← Page Builder settings schema
-      config.json        ← Default field values for local preview
-      widget.yml         ← Stores widget UUID (managed automatically)
+  acme/                  ← One folder per client (created by npx bcw init)
+    .env                 ← Store credentials (never committed)
+    my-banner/           ← Widget folders live directly here
+      widget.html
+      schema.json
+      config.json
+      widget.yml
+    custom-slider/
+      ...
 ```
 
 ---
 
-## Web UI Setup
+## Installation
 
-Use this if you want to download widgets through a browser interface without using the CLI.
+### Option A — From zip (share with your team)
 
-### Requirements
+```bash
+# Build a distributable zip (run once from the project root)
+npm run zip
+# → bigcommerce-widget-builder.zip
+```
 
-- [Node.js](https://nodejs.org) v18 or higher
+Share the zip. Recipients:
 
-### 1. Clone and install
+```bash
+unzip bigcommerce-widget-builder.zip
+cd bigcommerce-widget-builder
+npm install
+```
+
+### Option B — Clone from GitHub
 
 ```bash
 git clone https://github.com/CT-Talha/bigcommerce-widget-fetch.git
@@ -58,51 +72,145 @@ cd bigcommerce-widget-fetch
 npm install
 ```
 
-### 2. Start the server
+---
+
+## Web UI
+
+Use this to download widgets through a browser — no credentials stored, no terminal needed.
 
 ```bash
 node server.js
+# Open http://localhost:4040
 ```
 
-### 3. Open in browser
-
-```
-http://localhost:4040
-```
-
-### 4. How to use
-
-1. Enter your **BigCommerce Store Hash** and **API Access Token** → click **Connect**
-2. Your widgets will be listed
-3. Click **Download ZIP** to export all widgets
-4. Each widget in the ZIP includes `widget.html`, `schema.json`, `config.json`, and `widget.yml`
+1. Enter your **Store Hash** and **Access Token** → click **Connect**
+2. Your widgets are listed
+3. Click **Download ZIP** to export all widgets as files
 
 ---
 
-## Developer CLI
-
-The CLI (`npx bcw`) gives developers a full local workflow for building and managing widgets.
-
-### Requirements
-
-- [Node.js](https://nodejs.org) v18 or higher
-- A BigCommerce Store Hash and API Access Token
-
-### Install
+## Developer CLI — Quick Start
 
 ```bash
-git clone https://github.com/CT-Talha/bigcommerce-widget-fetch.git
-cd bigcommerce-widget-fetch
-npm install
+# 1. Create a client folder (run from the project root)
+npx bcw init acme
+
+# 2. Move into it
+cd acme
+
+# 3. Download all widgets from the store
+npx bcw download
+
+# 4. Start live preview for a widget
+npx bcw dev my-banner
+
+# 5. Push changes back to BigCommerce
+npx bcw push my-banner
 ```
 
-### First-time credentials setup
+---
 
-When you run any CLI command that needs your store credentials, the tool will automatically detect if a `.env` file is missing and prompt you to enter your Store Hash and Access Token. They are saved to `.env` locally and never sent anywhere except directly to BigCommerce.
+## Multi-Client Setup
+
+Each client store gets its own folder. Credentials are stored per-folder in `.env` and never committed to git.
+
+```bash
+# From the project root — create one folder per client
+npx bcw init acme
+npx bcw init globex
+npx bcw init initech
+
+# Work on acme
+cd acme
+npx bcw list
+npx bcw download
+
+# Switch to another client
+cd ../globex
+npx bcw list
+```
+
+`npx bcw init` automatically:
+- Creates the client folder
+- Prompts for Store Hash and Access Token
+- Saves credentials to `<client>/.env`
+- Adds `/<client>` to `.gitignore`
 
 ---
 
 ## CLI Commands
+
+Run all commands from **inside the client folder**.
+
+### `npx bcw init <name>` — Create a client folder
+
+```bash
+npx bcw init acme
+```
+
+### `npx bcw list` — List all widgets in the store
+
+```bash
+npx bcw list
+```
+
+### `npx bcw download` — Download widgets from store
+
+Downloads widgets directly into the current client folder.
+
+```bash
+npx bcw download           # download all widgets
+npx bcw download --all     # same, explicit
+npx bcw download "banner"  # download by partial name match
+npx bcw download 3         # download by number (from list)
+```
+
+### `npx bcw create <name>` — Scaffold a new widget
+
+```bash
+npx bcw create my-banner
+```
+
+Creates `my-banner/` in the current folder with:
+
+| File | Purpose |
+|---|---|
+| `widget.html` | Starter template with example fields |
+| `schema.json` | Basic schema (title, body text, colors) |
+| `config.json` | Default values for local preview |
+| `widget.yml` | Empty UUID — push will create it on BigCommerce |
+
+### `npx bcw dev <name>` — Live preview server
+
+```bash
+npx bcw dev my-banner
+# Open http://localhost:4041
+```
+
+- Controls generated from `schema.json` — supports all field types
+- Default values loaded from `config.json`
+- Preview reloads automatically on any file save
+- Override port: `DEV_PORT=5000 npx bcw dev my-banner`
+
+### `npx bcw push <name>` — Push widget to BigCommerce
+
+```bash
+npx bcw push my-banner
+```
+
+- No UUID in `widget.yml` → creates a new widget (`POST`) and saves UUID
+- UUID present → updates the existing widget (`PUT`)
+- Searches BC by name before creating to prevent accidental duplicates
+
+### `npx bcw delete <name>` — Delete widget from BigCommerce
+
+```bash
+npx bcw delete my-banner
+```
+
+- Prompts for confirmation before deleting
+- Removes widget from BigCommerce only — local folder is kept
+- Clears UUID from `widget.yml` so the next push creates it fresh
 
 ### `npx bcw -h` — Show help
 
@@ -112,117 +220,41 @@ npx bcw -h
 
 ---
 
-### `npx bcw list` — List all widgets
-
-Lists all widget templates in your store with their names and UUIDs.
-
-```bash
-npx bcw list
-```
-
----
-
-### `npx bcw create <name>` — Scaffold a new widget
-
-Creates a new widget folder under `widgets/<name>/` with starter files ready to edit.
-
-```bash
-npx bcw create my-banner
-```
-
-Generated files:
-
-| File | Purpose |
-|---|---|
-| `widget.html` | Starter template with a simple text block |
-| `schema.json` | Basic schema (title, body, colors) |
-| `config.json` | Default values for local preview |
-| `widget.yml` | Empty UUID — push will create a new widget |
-
----
-
-### `npx bcw dev <widget-folder>` — Live preview server
-
-Starts a local preview server at `http://localhost:4041` for the specified widget. Renders your widget with Page Builder-style controls generated from `schema.json`. Automatically reloads when you save any file.
-
-```bash
-npx bcw dev widgets/my-banner
-```
-
-- Controls are generated from `schema.json` — supports `input`, `color`, `range`, `select`, `visibility`, `array`
-- `config.json` provides the default data for the preview
-- Edit `widget.html`, `schema.json`, or `config.json` and the preview reloads automatically
-- The iframe grows to fit widget content — no clipping when items expand
-- Port defaults to `4041` — override with `DEV_PORT=5000 npx bcw dev widgets/my-banner`
-
----
-
-### `npx bcw push <widget-folder>` — Push widget to BigCommerce
-
-Pushes the widget to your store. If the widget has no UUID (new widget), it is created via `POST`. If it already has a UUID, it is updated via `PUT`. The UUID is automatically saved to `widget.yml` after creation.
-
-```bash
-npx bcw push widgets/my-banner
-```
-
----
-
-### `npx bcw download` — Download widgets from store
-
-Downloads widgets from your BigCommerce store and saves them to the `widgets/` folder.
-
-```bash
-# Download all widgets
-npx bcw download
-npx bcw download --all
-
-# Download one widget by partial name match
-npx bcw download "my-banner"
-
-# Download one widget by number (from npx bcw list)
-npx bcw download 3
-```
-
----
-
-### `npx bcw delete <widget-folder>` — Delete widget from BigCommerce
-
-Deletes the widget from BigCommerce after a `yes/no` confirmation. The local folder is **not** deleted. The UUID in `widget.yml` is automatically cleared — so running `npx bcw push` afterwards will create the widget fresh.
-
-```bash
-npx bcw delete widgets/my-banner
-```
-
----
-
 ## Widget Template Syntax
 
-BigCommerce widgets use a subset of Handlebars. Use these patterns in `widget.html`:
+BigCommerce widgets use a subset of Handlebars. Supported patterns in `widget.html`:
 
 ```handlebars
-{{field}}                              ← output a field value
-{{#if show_title '===' 'show'}} ... {{/if}}   ← equality check (visibility fields)
-{{#if title}} ... {{else}} ... {{/if}}         ← truthy check
-{{#each faq_items}} {{question}} {{/each}}     ← loop over an array field
-{{@index}}                             ← current loop index (0-based)
-{{../parentField}}                     ← access parent data inside #each
+{{field}}                                        Output a field value
+
+{{#if field}} ... {{else}} ... {{/if}}           Truthy check
+
+{{#if field '===' 'value'}} ... {{/if}}          Equality check (string)
+{{#if field '===' true}} ... {{/if}}             Equality check (boolean)
+
+{{#each items}} {{title}} {{/each}}              Loop over an array field
+{{@index}}                                       Current loop index (0-based)
+{{../parentField}}                               Access parent data inside #each
 ```
 
 ---
 
 ## Schema Types
 
-Supported `schema.json` field types:
+Supported `type` values in `schema.json`:
 
 | Type | Description |
 |---|---|
-| `input` | Single-line text field |
+| `input` | Single-line text input |
+| `text` | Multi-line text input |
 | `color` | Colour picker |
-| `range` | Slider — requires `typeMeta.rangeValues` with `min`, `max`, `step`, `unit` |
-| `select` | Dropdown — requires `typeMeta.selectOptions` array |
-| `visibility` | Show/Hide toggle — value is the string `"show"` or `"hide"` |
-| `array` | Repeatable group of fields — must be at the **top level** of schema |
-| `tab` | Groups sections in Page Builder — use for non-array settings |
+| `range` | Slider — requires `typeMeta.rangeValues` |
+| `select` | Dropdown — requires `typeMeta.selectOptions` |
+| `boolean` | Yes/No toggle |
+| `imageManager` | Image picker |
+| `visibility` | Show/Hide toggle — value is `"show"` or `"hide"` |
+| `array` | Repeatable group of fields |
+| `tab` | Groups sections inside array or at top level |
 
 ### `range` example
 
@@ -240,16 +272,16 @@ Supported `schema.json` field types:
 
 ### `array` example
 
-Arrays must be at the top level of `schema.json` and use a `tab → sections → settings` structure inside:
+Arrays must be at the **top level** of `schema.json` and contain `tab → sections → settings`:
 
 ```json
 [
   {
     "type": "array",
-    "id": "faq_items",
-    "label": "FAQ Items",
+    "id": "slides",
+    "label": "Slides",
     "defaultCount": 3,
-    "entryLabel": "question",
+    "entryLabel": "Slide",
     "schema": [
       {
         "type": "tab",
@@ -257,8 +289,9 @@ Arrays must be at the top level of `schema.json` and use a `tab → sections →
         "sections": [
           {
             "settings": [
-              { "type": "input", "id": "question", "label": "Question", "default": "Your question here" },
-              { "type": "input", "id": "answer",   "label": "Answer",   "default": "Your answer here" }
+              { "type": "input",        "id": "title",    "label": "Title",  "default": "Slide Title" },
+              { "type": "imageManager", "id": "imageUrl", "label": "Image" },
+              { "type": "boolean",      "id": "show_cta", "label": "Show Button", "default": "true" }
             ]
           }
         ]
@@ -275,32 +308,33 @@ Arrays must be at the top level of `schema.json` and use a `tab → sections →
 1. Log in to your BigCommerce store admin
 2. Go to **Settings → API → Store-level API Accounts**
 3. Click **Create API Account → Create V2/V3 API Token**
-4. Under **OAuth Scopes**, set **Content** to `modify`
-5. Copy the **Store Hash** (from the URL or the credential page) and the **Access Token**
+4. Under **OAuth Scopes** set **Content** to `modify`
+5. Copy the **Store Hash** and **Access Token**
 
 ---
 
 ## Security
 
-- Credentials entered in the Web UI are **never stored on the server** — the server is a stateless blind proxy
-- CLI credentials are stored only in a local `.env` file on your machine
-- The `.env` file is listed in `.gitignore` — it will never be committed to version control
+- Web UI credentials are **never stored on the server** — it is a stateless proxy
+- CLI credentials are stored only in `<client>/.env` on your local machine
+- `**/.env` is in `.gitignore` — credentials can never be accidentally committed
+- Each `npx bcw init` adds the client folder to `.gitignore` automatically
 
 ---
 
 ## Ports
 
-| Service | Default Port | Override |
+| Service | Default | Override |
 |---|---|---|
-| Web UI server | `4040` | `PORT=xxxx node server.js` |
-| Dev preview server | `4041` | `DEV_PORT=xxxx npx bcw dev ...` |
+| Web UI | `4040` | `PORT=xxxx node server.js` |
+| Dev preview | `4041` | `DEV_PORT=xxxx npx bcw dev <name>` |
 
 ---
 
 ## Tech Stack
 
 - **Server:** Node.js + Express (stateless proxy)
-- **Frontend:** Vanilla JS, HTML, CSS
+- **Frontend:** Vanilla JS, HTML, CSS (no build step)
 - **ZIP generation:** JSZip (runs entirely in the browser)
 - **CLI:** Node.js ESM, `npx`-compatible via `package.json` `bin` field
 - **Live reload:** Server-Sent Events (SSE) + `fs.watch`

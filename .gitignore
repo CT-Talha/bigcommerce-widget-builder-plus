@@ -1,9 +1,19 @@
 node_modules/
+*.zip
+.claude/
+
+# Credentials — root and all client folders
+# **/.env covers any client folder regardless of name
 .env
 .env.*
-widgets/
-.claude/
+**/.env
 
 # macOS
 .DS_Store
 **/.DS_Store
+
+# ── Client folders ────────────────────────────────────────────────────────────
+# Added automatically by: npx bcw init <client-name>
+# Each developer adds their own below after running init.
+/talha-sandbox
+/referee-store

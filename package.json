@@ -1,19 +1,28 @@
 {
-  "name": "bc-widget-customizations",
+  "name": "bigcommerce-widget-builder",
   "version": "1.0.0",
-  "description": "BigCommerce Widget Customizations — download, edit and push widgets",
+  "description": "CLI tool to download, preview and push BigCommerce Page Builder widgets",
   "type": "module",
   "bin": {
     "bcw": "./scripts/cli.js"
   },
+  "files": [
+    "scripts/",
+    "server.js",
+    "README.md"
+  ],
   "scripts": {
     "start": "node server.js",
-    "postinstall": "node scripts/postinstall.js"
+    "postinstall": "node scripts/postinstall.js",
+    "zip": "node scripts/pack.js"
   },
   "dependencies": {
     "express": "^4.19.2"
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "archiver": "^7.0.1"
   }
 }

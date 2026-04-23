@@ -44,10 +44,14 @@ function resolveWidgetDir(arg) {
     process.exit(1);
   }
 
-  // Try the path as-is first, then prepend widgets/
+  const cwd = process.cwd();
+  // Strip legacy "widgets/" prefix if someone passes it
+  const stripped = arg.replace(/^widgets[\\/]/, '');
+
+  // Widget folders live directly in the client folder
   const candidates = [
-    path.resolve(process.cwd(), arg),
-    path.resolve(process.cwd(), 'widgets', arg),
+    path.resolve(cwd, stripped),
+    path.resolve(cwd, arg),
   ];
 
   for (const candidate of candidates) {
@@ -56,14 +60,15 @@ function resolveWidgetDir(arg) {
     }
   }
 
-  console.error(`ERROR: Widget folder not found: ${arg}`);
-  console.error('Available widgets:');
-  const widgetsDir = path.resolve(process.cwd(), 'widgets');
-  if (fs.existsSync(widgetsDir)) {
-    for (const name of fs.readdirSync(widgetsDir)) {
-      console.error(`  widgets/${name}`);
+  console.error(`\n  Error: Widget folder not found: ${arg}`);
+  console.error('  Available widgets:');
+  for (const entry of fs.readdirSync(cwd)) {
+    const full = path.join(cwd, entry);
+    if (fs.statSync(full).isDirectory() && fs.existsSync(path.join(full, 'widget.yml'))) {
+      console.error(`    ${entry}`);
     }
   }
+  console.error('');
   process.exit(1);
 }
 
@@ -111,11 +116,42 @@ function readWidget(widgetDir) {
 // ---------------------------------------------------------------------------
 // Push to BigCommerce — POST (new) or PUT (existing)
 // ---------------------------------------------------------------------------
+// If no UUID in widget.yml, search BC for an existing template with the same
+// name — prevents creating duplicates when widget.yml was cleared or lost.
+// ---------------------------------------------------------------------------
+async function findExistingUuid(name) {
+  let page = 1;
+  while (true) {
+    const res = await fetch(`${BASE_URL}/widget-templates?page=${page}&limit=50`, { headers: HEADERS });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const match = (json.data ?? []).find(t => t.name === name);
+    if (match) return match.uuid;
+    const meta = json.meta?.pagination ?? {};
+    if (page >= (meta.total_pages ?? 1)) break;
+    page++;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 async function pushWidget(widget) {
-  const isNew = !widget.uuid;
+  let { uuid } = widget;
+
+  // No local UUID — check BC for an existing widget with the same name
+  // to avoid creating a duplicate on repeated pushes
+  if (!uuid) {
+    const existing = await findExistingUuid(widget.name);
+    if (existing) {
+      console.log(`  ⚠  No UUID in widget.yml but found existing widget on BC — updating instead of creating duplicate.`);
+      uuid = existing;
+    }
+  }
+
+  const isNew = !uuid;
   const url = isNew
     ? `${BASE_URL}/widget-templates`
-    : `${BASE_URL}/widget-templates/${widget.uuid}`;
+    : `${BASE_URL}/widget-templates/${uuid}`;
 
   const body = {
     name: widget.name,

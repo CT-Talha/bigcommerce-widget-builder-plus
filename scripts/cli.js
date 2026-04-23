@@ -22,35 +22,47 @@ const HELP = `
   Usage:
     npx bcw <command> [args]
 
-  Commands:
-    list                     List all widgets in your store (with numbers)
-    create <name>            Scaffold a new widget with starter files
-    dev    <widget-folder>   Start live preview server with schema controls
-    push   <widget-folder>   Push a widget to your BigCommerce store
-    delete <widget-folder>   Delete a widget from your BigCommerce store
+  ── Servers ────────────────────────────────────────
+    node server.js
+      Web UI at http://localhost:4040
+      Download widgets from any store via browser
+
+    npx bcw dev <name>
+      Live preview at http://localhost:4041
+      Build & preview a widget with schema controls
+
+  ── Setup ──────────────────────────────────────────
+    init <name>              Create a new client folder + save credentials
+                             Then: cd <name> and use all commands below
+
+  ── Commands (run from inside the client folder) ───
+    list                     List all widgets in the store
+    create <name>            Scaffold a new widget
+    dev    <name>            Start live preview server
+    push   <name>            Push widget to BigCommerce
+    delete <name>            Delete widget from BigCommerce
     download                 Download all widgets
     download --all           Download all widgets (explicit)
-    download "<name>"        Download one widget by name (partial match ok)
-    download <number>        Download one widget by number from list
+    download "<name>"        Download one widget by name
+    download <number>        Download one widget by number
 
-  Examples:
+  ── Examples ───────────────────────────────────────
+    npx bcw init acme           (run from project root)
+
+    cd acme
     npx bcw list
-    npx bcw create my-banner
-    npx bcw dev widgets/my-banner
-    npx bcw push widgets/my-banner
-    npx bcw delete widgets/my-banner
     npx bcw download
-    npx bcw download "My Banner"
-    npx bcw download 2
+    npx bcw create my-banner
+    npx bcw dev my-banner
+    npx bcw push my-banner
+    npx bcw delete my-banner
 
-  Options:
-    -h, --help               Show this help message
+  ── Options ────────────────────────────────────────
+    -h, --help               Show this help
 
-  Notes:
-    • New widgets (no UUID) are automatically POSTed to create them.
-    • Existing widgets (have UUID) are PUTed to update them.
-    • The dev server runs on port 4041 by default (set DEV_PORT to override).
-    • The main server runs on port 4040 (set PORT to override).
+  ── Ports ──────────────────────────────────────────
+    Web UI      : 4040  (override: PORT=xxxx node server.js)
+    Dev preview : 4041  (override: DEV_PORT=xxxx npx bcw dev ...)
 `;
 
 function spawnScript(scriptName, scriptArgs) {
@@ -64,10 +76,17 @@ function spawnScript(scriptName, scriptArgs) {
 
 async function run() {
   switch (command) {
+
+    case 'init': {
+      const { initClient } = await import('./init.js');
+      await initClient(args[0]);
+      break;
+    }
+
     case 'create': {
       if (!args[0]) {
         console.error('\n  Error: widget name is required.');
-        console.error('  Example: npm run bc-widget -- create my-banner\n');
+        console.error('  Usage: npx bcw create <widget-name>\n');
         process.exit(1);
       }
       const { createWidget } = await import('./create.js');
@@ -77,8 +96,8 @@ async function run() {
 
     case 'dev': {
       if (!args[0]) {
-        console.error('\n  Error: widget folder is required.');
-        console.error('  Example: npm run bc-widget -- dev widgets/my-banner\n');
+        console.error('\n  Error: widget name is required.');
+        console.error('  Usage: npx bcw dev <name>\n');
         process.exit(1);
       }
       const { startDev } = await import('./dev.js');
@@ -93,23 +112,23 @@ async function run() {
       break;
     }
 
-    case 'delete': {
-      if (!args[0]) {
-        console.error('\n  Error: widget folder is required.');
-        console.error('  Example: npx bcw delete widgets/my-banner\n');
-        process.exit(1);
-      }
-      spawnScript('delete.js', args);
-      break;
-    }
-
     case 'push': {
       if (!args[0]) {
-        console.error('\n  Error: widget folder is required.');
-        console.error('  Example: npm run bc-widget -- push widgets/my-banner\n');
+        console.error('\n  Error: widget name is required.');
+        console.error('  Usage: npx bcw push <name>\n');
         process.exit(1);
       }
       spawnScript('push.js', args);
+      break;
+    }
+
+    case 'delete': {
+      if (!args[0]) {
+        console.error('\n  Error: widget name is required.');
+        console.error('  Usage: npx bcw delete <name>\n');
+        process.exit(1);
+      }
+      spawnScript('delete.js', args);
       break;
     }
 

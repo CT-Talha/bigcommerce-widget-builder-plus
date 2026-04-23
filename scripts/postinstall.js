@@ -18,14 +18,15 @@ ${CYAN}${BOLD}  ╔════════════════════�
   ${BOLD}  node server.js${RESET}
   ${DIM}  Then open http://localhost:4040${RESET}
 
-  ${BLUE}${BOLD}── Developer CLI${RESET} ${DIM}(full local workflow for developers)${RESET}
-  ${BOLD}  npx bcw list${RESET}                  ${DIM}List all widgets in your store${RESET}
-  ${BOLD}  npx bcw create <name>${RESET}          ${DIM}Scaffold a new widget${RESET}
-  ${BOLD}  npx bcw dev widgets/<name>${RESET}     ${DIM}Live preview with schema controls${RESET}
-  ${BOLD}  npx bcw push widgets/<name>${RESET}    ${DIM}Push widget to BigCommerce${RESET}
-  ${BOLD}  npx bcw download${RESET}               ${DIM}Download widgets from your store${RESET}
-  ${BOLD}  npx bcw delete widgets/<name>${RESET}  ${DIM}Delete widget from BigCommerce${RESET}
+  ${BLUE}${BOLD}── Developer CLI${RESET} ${DIM}(one folder per client)${RESET}
+  ${BOLD}  npx bcw init <client>${RESET}          ${DIM}Create a client folder + save credentials${RESET}
+  ${BOLD}  cd <client>${RESET}                    ${DIM}Switch into the client folder${RESET}
+  ${BOLD}  npx bcw list${RESET}                   ${DIM}List all widgets in the store${RESET}
+  ${BOLD}  npx bcw download${RESET}               ${DIM}Download widgets from the store${RESET}
+  ${BOLD}  npx bcw create <name>${RESET}           ${DIM}Scaffold a new widget${RESET}
+  ${BOLD}  npx bcw dev <name>${RESET}               ${DIM}Live preview at localhost:4041${RESET}
+  ${BOLD}  npx bcw push <name>${RESET}              ${DIM}Push widget to BigCommerce${RESET}
+  ${BOLD}  npx bcw delete <name>${RESET}            ${DIM}Delete widget from BigCommerce${RESET}
 
   ${DIM}Run ${RESET}${BOLD}npx bcw -h${RESET}${DIM} at any time to see all commands.${RESET}
-  ${DIM}First run will ask for your Store Hash and API Token.${RESET}
 `);

@@ -187,7 +187,7 @@ function writeWidget(template, widgetsDir) {
 // ---------------------------------------------------------------------------
 async function main() {
   const arg = process.argv[2]; // optional: name, number, or --all
-  const widgetsDir = path.resolve(process.cwd(), 'widgets');
+  const widgetsDir = process.cwd(); // widgets live directly in the client folder
   fs.mkdirSync(widgetsDir, { recursive: true });
 
   console.log('\nFetching widget list from BigCommerce...');
@@ -210,8 +210,8 @@ async function main() {
     console.log(`     Path : ${path.relative(process.cwd(), dir)}\n`);
   }
 
-  console.log(`Done. Edit files inside widgets/ then run:`);
-  console.log(`  npx bcw push widgets/<widget-folder>\n`);
+  console.log(`Done. Edit widget files then run:`);
+  console.log(`  npx bcw push <widget-folder>\n`);
 }
 
 main().catch((err) => {
