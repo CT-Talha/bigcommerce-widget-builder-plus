@@ -38,9 +38,10 @@ const HELP = `
   ── Commands (run from inside the client folder) ───
     list                     List all widgets in the store
     create <name>            Scaffold a new widget
-    dev    <name>            Start live preview server
-    push   <name>            Push widget to BigCommerce
-    delete <name>            Delete widget from BigCommerce
+    dev      <name>          Start live preview server
+    validate <name>          Validate schema.json before pushing
+    push     <name>          Validate + push widget to BigCommerce
+    delete   <name>          Delete widget from BigCommerce
     download                 Download all widgets
     download --all           Download all widgets (explicit)
     download "<name>"        Download one widget by name
@@ -54,6 +55,7 @@ const HELP = `
     npx bcw download
     npx bcw create my-banner
     npx bcw dev my-banner
+    npx bcw validate my-banner
     npx bcw push my-banner
     npx bcw delete my-banner
 
@@ -109,6 +111,48 @@ async function run() {
       const { fetchTemplates, printTable } = await import('./list.js');
       const templates = await fetchTemplates();
       printTable(templates);
+      break;
+    }
+
+    case 'validate': {
+      if (!args[0]) {
+        console.error('\n  Error: widget name is required.');
+        console.error('  Usage: npx bcw validate <name>\n');
+        process.exit(1);
+      }
+      const { validateSchema } = await import('./validate.js');
+      const fs = await import('node:fs');
+      const pathMod = await import('node:path');
+      const cwd = process.cwd();
+      const stripped = args[0].replace(/^widgets[\\/]/, '');
+      const widgetDir = fs.default.existsSync(pathMod.default.resolve(cwd, stripped))
+        ? pathMod.default.resolve(cwd, stripped)
+        : pathMod.default.resolve(cwd, args[0]);
+      const schemaPath = pathMod.default.join(widgetDir, 'schema.json');
+      if (!fs.default.existsSync(schemaPath)) {
+        console.error(`\n  Error: schema.json not found in ${widgetDir}\n`);
+        process.exit(1);
+      }
+      let schema;
+      try { schema = JSON.parse(fs.default.readFileSync(schemaPath, 'utf8')); }
+      catch (e) { console.error(`\n  Error: schema.json is not valid JSON — ${e.message}\n`); process.exit(1); }
+      console.log(`\n  Validating ${pathMod.default.basename(widgetDir)}/schema.json...`);
+      const result = validateSchema(schema);
+      const { errors, warnings } = result;
+      if (errors.length === 0 && warnings.length === 0) {
+        console.log(`\n  ✓  schema.json is valid\n`);
+      } else {
+        if (errors.length) {
+          console.log(`\n  Errors (${errors.length}):`);
+          for (const e of errors) { console.log(`\n  ✗  ${e.path}\n     ${e.message}`); }
+        }
+        if (warnings.length) {
+          console.log(`\n  Warnings (${warnings.length}):`);
+          for (const w of warnings) { console.log(`\n  ⚠  ${w.path}\n     ${w.message}`); }
+        }
+        console.log('');
+        if (!result.ok) process.exit(1);
+      }
       break;
     }
 

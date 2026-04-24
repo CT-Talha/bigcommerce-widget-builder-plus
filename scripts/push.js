@@ -16,6 +16,7 @@
 import fs from 'fs';
 import path from 'path';
 import { loadEnv } from './env.js';
+import { validateSchema } from './validate.js';
 
 await loadEnv();
 
@@ -186,7 +187,28 @@ async function main() {
   console.log(`Reading widget from: ${path.relative(process.cwd(), widgetDir)}\n`);
   const widget = readWidget(widgetDir);
 
-  console.log(`Widget  : ${widget.name}`);
+  // ── Validate schema before touching BigCommerce ──────────────────────────
+  process.stdout.write(`  Validating schema.json...`);
+  const validation = validateSchema(widget.schema);
+  if (!validation.ok) {
+    console.log(' ✗\n');
+    for (const e of validation.errors) {
+      console.error(`  ✗  ${e.path}\n     ${e.message}\n`);
+    }
+    console.error(`  Push cancelled — fix the schema errors above and try again.\n`);
+    process.exit(1);
+  }
+  if (validation.warnings.length) {
+    console.log(` ⚠  (${validation.warnings.length} warning${validation.warnings.length > 1 ? 's' : ''})`);
+    for (const w of validation.warnings) {
+      console.warn(`  ⚠  ${w.path}\n     ${w.message}`);
+    }
+    console.log('');
+  } else {
+    console.log(' ✓');
+  }
+
+  console.log(`\nWidget  : ${widget.name}`);
   console.log(`UUID    : ${widget.uuid || '(new — will be assigned by BigCommerce)'}`);
   console.log(`\n${widget.uuid ? 'Updating' : 'Creating'} widget on BigCommerce...`);
 
