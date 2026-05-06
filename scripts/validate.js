@@ -80,10 +80,13 @@ function validateSetting(setting, atPath, result) {
     if (!rv) {
       result.error(atPath, '"range" requires typeMeta.rangeValues: { min, max, step, unit }');
     } else {
-      for (const key of ['min', 'max', 'step', 'unit']) {
-        if (rv[key] === undefined || rv[key] === null || rv[key] === '') {
+      for (const key of ['min', 'max', 'step']) {
+        if (rv[key] === undefined || rv[key] === null) {
           result.error(atPath, `typeMeta.rangeValues.${key} is required for "range"`);
         }
+      }
+      if (rv.unit === undefined || rv.unit === null) {
+        result.error(atPath, 'typeMeta.rangeValues.unit is required for "range" (use "" for unitless)');
       }
       if (typeof rv.min === 'number' && typeof rv.max === 'number' && rv.min >= rv.max) {
         result.error(atPath, `typeMeta.rangeValues.min (${rv.min}) must be less than max (${rv.max})`);
@@ -156,7 +159,7 @@ function validateTab(tab, atPath, result) {
 // ── Validate an array element ────────────────────────────────────────────────
 function validateArray(item, atPath, result) {
   if (!item.id)         result.error(atPath, '"id" is required on array');
-  if (!item.label)      result.error(atPath, '"label" is required on array');
+  if (!item.label)      result.warn(atPath, '"label" is missing on array (recommended)');
   if (!item.entryLabel) result.error(atPath, '"entryLabel" is required on array');
 
   if (!Array.isArray(item.schema) || item.schema.length === 0) {

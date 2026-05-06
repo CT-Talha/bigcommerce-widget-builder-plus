@@ -113,23 +113,35 @@ bigcommerce-widget-fetch/
 
 ---
 
-## BC schema types (validated from live testing)
+## BC schema types (validated from live testing + official BC widget-builder source)
 
 | Type | Notes |
 |---|---|
-| `input` | Single-line text. Use instead of `textarea` (not valid in BC) |
+| `input` | Single-line text |
+| `text` | Multi-line text box (supports `typeMeta.maxLength`) |
 | `color` | Colour picker |
-| `range` | Requires `typeMeta.rangeValues: { min, max, step, unit }` |
+| `range` | Requires `typeMeta.rangeValues: { min, max, step, unit }`. `unit` can be `""` for unitless |
 | `select` | Requires `typeMeta.selectOptions: [{ value, label }]` |
 | `visibility` | Returns string `"show"` or `"hide"` — NOT a boolean |
-| `array` | Must be at **top level** of schema array, NOT inside a tab |
-| `tab` | Groups sections. Use for non-array settings |
+| `boolean` | Boolean toggle |
+| `toggle` | Toggle switch |
+| `imageManager` | Image picker. Default: `{ src: "", type: "IMAGE_MANAGER" }` |
+| `boxModel` | Margin/padding box model control |
+| `array` | Must be at **top level** of schema array, NOT inside a tab. `label` is optional |
+| `tab` | Groups sections |
 | `hidden` | Hidden field |
+| `alignment` | Alignment control |
+| `code` | Code editor |
+| `element` | Element picker |
+| `number` | Number input |
+| `productId` | Product selector |
+| `productImage` | Product image |
+| `regexInput` | Input with regex validation |
+| `typography` | Typography control |
 
 **Invalid types (confirmed from live BC testing):**
 - `checkbox` — NOT valid
 - `textarea` — NOT valid
-- `boolean` — NOT valid
 
 **Invalid Handlebars helpers in BC:**
 - `(eq ...)` subexpression — NOT registered. Use `'==='` operator syntax instead
