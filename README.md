@@ -1,5 +1,7 @@
 # BigCommerce Widget Builder
 
+> **Disclaimer:** This repository is read-only for general use. Do not push or commit any changes — pull updates only using `git pull origin main`. If you encounter an error or issue, do not attempt to fix it yourself. Instead, report it by emailing [talha.ashraf@coalitiontechnologies.com](mailto:talha.ashraf@coalitiontechnologies.com).
+
 A web-based tool and developer CLI for downloading, creating, previewing, and managing BigCommerce widget templates. Built for agency teams — the web UI requires no technical knowledge, while the CLI gives developers a full local workflow with live preview.
 
 ---
@@ -43,6 +45,40 @@ bigcommerce-widget-builder/
     custom-slider/
       ...
 ```
+
+---
+
+## Requirements
+
+### Node.js
+
+- **Node.js 18 or higher** is required
+- Check your version: `node -v`
+- Download from [nodejs.org](https://nodejs.org) if needed
+
+### BigCommerce API Access Token
+
+When creating the API token in your BigCommerce store, the following OAuth scopes are required:
+
+| Scope | Permission |
+|---|---|
+| **Content** | `modify` |
+
+All other scopes can be left at `none`.
+
+Steps to create the token:
+1. Log in to your BigCommerce store admin
+2. Go to **Settings → API → Store-level API Accounts**
+3. Click **Create API Account → Create V2/V3 API Token**
+4. Set **Content** scope to `modify`
+5. Copy the **Store Hash** (from the URL or the confirmation screen) and the **Access Token**
+
+> The Store Hash is the alphanumeric ID in your store URL: `https://store-{STORE_HASH}.mybigcommerce.com`
+
+### Network Access
+
+- Outbound HTTPS access to `api.bigcommerce.com` is required for all CLI commands that talk to BigCommerce (`list`, `download`, `push`, `delete`)
+- The Web UI (`server.js`) acts as a proxy — the browser makes requests through it to `api.bigcommerce.com`
 
 ---
 
@@ -321,16 +357,6 @@ Arrays must be at the **top level** of `schema.json` and contain `tab → sectio
   }
 ]
 ```
-
----
-
-## Getting BigCommerce API Credentials
-
-1. Log in to your BigCommerce store admin
-2. Go to **Settings → API → Store-level API Accounts**
-3. Click **Create API Account → Create V2/V3 API Token**
-4. Under **OAuth Scopes** set **Content** to `modify`
-5. Copy the **Store Hash** and **Access Token**
 
 ---
 
