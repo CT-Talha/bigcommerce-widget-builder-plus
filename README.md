@@ -212,6 +212,16 @@ npx bcw delete my-banner
 - Removes widget from BigCommerce only — local folder is kept
 - Clears UUID from `widget.yml` so the next push creates it fresh
 
+### `npx bcw validate <name>` — Validate schema.json
+
+```bash
+npx bcw validate my-banner
+```
+
+- Checks `schema.json` against BigCommerce's rules before pushing
+- Reports errors (must fix) and warnings (recommended fixes)
+- Catches: invalid types, missing required fields, malformed `range`/`select`, bad `visibility` defaults
+
 ### `npx bcw -h` — Show help
 
 ```bash
@@ -246,15 +256,26 @@ Supported `type` values in `schema.json`:
 | Type | Description |
 |---|---|
 | `input` | Single-line text input |
-| `text` | Multi-line text input |
+| `text` | Multi-line text box (supports `typeMeta.maxLength`) |
 | `color` | Colour picker |
-| `range` | Slider — requires `typeMeta.rangeValues` |
-| `select` | Dropdown — requires `typeMeta.selectOptions` |
-| `boolean` | Yes/No toggle |
-| `imageManager` | Image picker |
-| `visibility` | Show/Hide toggle — value is `"show"` or `"hide"` |
-| `array` | Repeatable group of fields |
+| `range` | Slider — requires `typeMeta.rangeValues: { min, max, step, unit }`. Use `""` for unitless |
+| `select` | Dropdown — requires `typeMeta.selectOptions: [{ label, value }]` |
+| `boolean` | Boolean — value is `true` or `false` |
+| `toggle` | Toggle switch |
+| `visibility` | Show/Hide — value is `"show"` or `"hide"` (string, not boolean) |
+| `imageManager` | Image picker — default: `{ src: "", type: "IMAGE_MANAGER" }` |
+| `boxModel` | Margin/padding box model (top, right, bottom, left with units) |
+| `alignment` | Alignment control |
+| `typography` | Typography control |
+| `number` | Number input |
+| `code` | Code editor |
+| `regexInput` | Text input with regex validation |
+| `element` | Element picker |
+| `productId` | Product selector |
+| `productImage` | Product image picker |
+| `array` | Repeatable group — must be at top level, not inside a tab. `label` is optional |
 | `tab` | Groups sections inside array or at top level |
+| `hidden` | Hidden field (no UI) |
 
 ### `range` example
 
