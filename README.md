@@ -84,15 +84,11 @@ Steps to create the token:
 
 ## Installation
 
-### Option A — From zip (share with your team)
+### Option A — Download the latest release (recommended)
 
-```bash
-# Build a distributable zip (run once from the project root)
-npm run zip
-# → bigcommerce-widget-builder.zip
-```
+👉 **[Download bigcommerce-widget-builder.zip](https://github.com/CT-Talha/bigcommerce-widget-builder-plus/releases/latest)**
 
-Share the zip. Recipients:
+Then run:
 
 ```bash
 unzip bigcommerce-widget-builder.zip
@@ -100,11 +96,30 @@ cd bigcommerce-widget-builder
 npm install
 ```
 
+> Always get the latest version at:
+> `https://github.com/CT-Talha/bigcommerce-widget-builder-plus/releases/latest`
+
 ### Option B — Clone from GitHub
 
 ```bash
-git clone https://github.com/CT-Talha/bigcommerce-widget-fetch.git
-cd bigcommerce-widget-fetch
+git clone https://github.com/CT-Talha/bigcommerce-widget-builder-plus.git
+cd bigcommerce-widget-builder-plus
+npm install
+```
+
+### Option C — Build and share your own zip
+
+```bash
+# Build a distributable zip (run once from the project root)
+npm run zip
+# → bigcommerce-widget-builder.zip
+```
+
+Share the zip with your team. Recipients run:
+
+```bash
+unzip bigcommerce-widget-builder.zip
+cd bigcommerce-widget-builder
 npm install
 ```
 
