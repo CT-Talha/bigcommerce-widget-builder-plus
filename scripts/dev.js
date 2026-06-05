@@ -144,6 +144,19 @@ function flattenSettings(schema) {
   return out;
 }
 
+/** Merge schema defaults into live values, including per-item defaults for arrays */
+function mergeWithDefaults(schema, live) {
+  const defaults = defaultsFromSchema(schema);
+  const merged = { ...defaults, ...live };
+  for (const s of flattenSettings(schema)) {
+    if (s.type === 'array' && Array.isArray(merged[s.id]) && defaults[s.id]?.[0]) {
+      const itemDefaults = defaults[s.id][0];
+      merged[s.id] = merged[s.id].map(item => ({ ...itemDefaults, ...item }));
+    }
+  }
+  return merged;
+}
+
 /** Build default values map from schema — arrays become arrays of default items */
 function defaultsFromSchema(schema) {
   const out = {};
@@ -211,7 +224,7 @@ function renderControl(setting, value) {
     }
 
     case 'select': {
-      const opts = (setting.options ?? [])
+      const opts = (setting.typeMeta?.selectOptions ?? [])
         .map(o => `<option value="${esc(o.value)}" ${String(val) === String(o.value) ? 'selected' : ''}>${esc(o.label)}</option>`)
         .join('');
       return `<div class="ctrl-row">
@@ -421,7 +434,7 @@ export async function startDev(widgetFolder) {
   app.get('/render', (req, res) => {
     const schema = getSchema();
     // Merge schema defaults under live values so new fields appear correctly
-    liveValues = { ...defaultsFromSchema(schema), ...liveValues };
+    liveValues = mergeWithDefaults(schema, liveValues);
     res.json({
       html: renderTemplate(getTemplate(), liveValues),
       controls: renderControls(schema, liveValues),
@@ -431,7 +444,7 @@ export async function startDev(widgetFolder) {
   /** Main preview page */
   app.get('/', (_req, res) => {
     const schema = getSchema();
-    liveValues = { ...defaultsFromSchema(schema), ...liveValues };
+    liveValues = mergeWithDefaults(schema, liveValues);
     const rendered = renderTemplate(getTemplate(), liveValues);
     const controls = renderControls(schema, liveValues);
 
