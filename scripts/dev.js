@@ -31,114 +31,170 @@ function esc(str) {
     .replace(/"/g, '&quot;');
 }
 
-/** Render one {{#each}} item body with its own context */
-function renderEachItem(body, item, index, parentData, widgetId) {
-  // {{#if ../field '===' 'value'}} or '===' true/false — parent context equality
-  body = body.replace(
-    /\{\{#if\s+\.\.\/(\w+)\s+'==='\s+(?:'([^']*)'|(true|false))\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
-    (_, k, quotedVal, boolVal, truthy, falsy = '') => {
-      const actual   = String(parentData[k] ?? '');
-      const expected = quotedVal !== undefined ? quotedVal : boolVal;
-      return actual === expected ? truthy : falsy;
+/**
+ * Minimal template engine for the BC-style Handlebars subset used in widget.html:
+ *   {{field}}, {{{field}}}, {{a.b.c}}, {{../field}}, {{@index}}, {{_.id}}, {{_.data.field}}
+ *   {{#if cond}}...{{else if cond}}...{{else}}...{{/if}}
+ *   {{#unless cond}}...{{else}}...{{/unless}}
+ *   {{#each field}}...{{/each}}
+ * where cond is `field`, `field '===' 'value'`, `field '===' true|false|undefined`, or `!==`.
+ * A real Handlebars-compiled render is used when pushed to BC — this only drives local preview.
+ */
+
+/** Resolve a (possibly dotted, possibly ../-prefixed) key against a render context */
+function getValue(ctx, key, widgetId) {
+  key = key.trim();
+  if (key === '@index') return ctx.index;
+  if (key.startsWith('../')) return ctx.parent ? getValue(ctx.parent, key.slice(3), widgetId) : undefined;
+  if (key === '_.id') return widgetId;
+  if (key.startsWith('_.data.')) return getValue(ctx, key.slice(7), widgetId);
+  if (key.startsWith('_.')) return undefined; // BC runtime context — unavailable in local preview
+
+  const resolve = (obj) => key.split('.').reduce((acc, part) => (acc == null ? undefined : acc[part]), obj);
+  const own = resolve(ctx.data);
+  if (own !== undefined || !ctx.parent) return own;
+  return resolve(ctx.parent.data); // fall back to parent data for fields not on the current #each item
+}
+
+const COND_RE = /^(\S+)(?:\s+'(===|!==)'\s+(?:'([^']*)'|(true|false)|(undefined)))?$/;
+
+/** Evaluate a `field`, `field '===' 'value'`, etc. condition string */
+function evalCond(ctx, widgetId, raw) {
+  const m = COND_RE.exec(raw.trim());
+  if (!m) return false;
+  const [, key, op, quotedVal, boolVal, bareVal] = m;
+  const actual = getValue(ctx, key, widgetId);
+  if (!op) return !!actual;
+  const eq = bareVal === 'undefined'
+    ? actual === undefined
+    : String(actual ?? '') === (quotedVal !== undefined ? quotedVal : boolVal);
+  return op === '!==' ? !eq : eq;
+}
+
+/** Substitute {{{field}}} and {{field}} expressions inside a leaf text chunk */
+function renderText(str, ctx, widgetId) {
+  str = str.replace(/\{\{\{\s*([^}]+?)\s*\}\}\}/g, (_, expr) => {
+    // {{{json .}}} / {{{json field}}} — BC's Handlebars `json` helper, serializes a value to JSON
+    const jsonCall = /^json\s+(.+)$/.exec(expr.trim());
+    if (jsonCall) {
+      const arg = jsonCall[1].trim();
+      // '.'/'this' — the whole root context, which on real BC also carries `_` (id, editor state, etc.)
+      const v = (arg === '.' || arg === 'this')
+        ? { ...ctx.data, _: { id: widgetId, context: { isEditorMode: false }, pageBuilderData: { previewState: { editMode: false } } } }
+        : getValue(ctx, arg, widgetId);
+      return JSON.stringify(v ?? null);
     }
-  );
-  // {{#if field '===' 'value'}} or {{#if field '===' true/false}} — item context equality
-  body = body.replace(
-    /\{\{#if\s+(\w+)\s+'==='\s+(?:'([^']*)'|(true|false))\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
-    (_, k, quotedVal, boolVal, truthy, falsy = '') => {
-      const actual   = String(item[k] ?? parentData[k] ?? '');
-      const expected = quotedVal !== undefined ? quotedVal : boolVal;
-      return actual === expected ? truthy : falsy;
+    const v = getValue(ctx, expr, widgetId);
+    return v !== undefined ? String(v) : '';
+  });
+  str = str.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, key) => {
+    const v = getValue(ctx, key, widgetId);
+    return v !== undefined ? String(v) : '';
+  });
+  return str;
+}
+
+const BLOCK_TAG_RE = /\{\{\s*(#if|#unless|#each|else if|else|\/if|\/unless|\/each)\s*([^}]*?)\s*\}\}/g;
+
+/** Parse block helpers ({{#if}}/{{#unless}}/{{#each}} incl. else-if chains) into a small AST */
+function parseTemplate(src) {
+  const root = { active: [] };
+  const stack = [root];
+  const top = () => stack[stack.length - 1];
+  const pushText = (str) => { if (str) top().active.push({ type: 'text', value: str }); };
+
+  BLOCK_TAG_RE.lastIndex = 0;
+  let pos = 0, match;
+  while ((match = BLOCK_TAG_RE.exec(src))) {
+    pushText(src.slice(pos, match.index));
+    pos = match.index + match[0].length;
+    const [, tag, args] = match;
+
+    if (tag === '#if' || tag === '#unless') {
+      const node = { type: tag === '#if' ? 'if' : 'unless', branches: [{ cond: args, children: [] }], elseChildren: null };
+      top().active.push(node);
+      stack.push({ node, active: node.branches[0].children });
+    } else if (tag === 'else if') {
+      const branch = { cond: args, children: [] };
+      top().node.branches.push(branch);
+      top().active = branch.children;
+    } else if (tag === 'else') {
+      top().node.elseChildren = [];
+      top().active = top().node.elseChildren;
+    } else if (tag === '/if' || tag === '/unless') {
+      stack.pop();
+    } else if (tag === '#each') {
+      const node = { type: 'each', key: args.trim(), children: [] };
+      top().active.push(node);
+      stack.push({ node, active: node.children });
+    } else if (tag === '/each') {
+      stack.pop();
     }
-  );
-  // {{#if ../field}} — parent truthy
-  body = body.replace(
-    /\{\{#if\s+\.\.\/(\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
-    (_, k, truthy, falsy = '') => parentData[k] ? truthy : falsy
-  );
-  // {{#if field}} — item truthy
-  body = body.replace(
-    /\{\{#if\s+(\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
-    (_, k, truthy, falsy = '') => item[k] ? truthy : falsy
-  );
-  body = body.replace(/\{\{@index\}\}/g, String(index));
-  body = body.replace(/\{\{\.\.\/_\.id\}\}/g, widgetId);
-  body = body.replace(/\{\{_\.id\}\}/g, widgetId);
-  // {{../_.data.field}} and {{_.data.field}} — legacy
-  body = body.replace(/\{\{\.\.\/_\.data\.(\w+)\}\}/g, (_, k) => String(parentData[k] ?? ''));
-  body = body.replace(/\{\{_\.data\.(\w+)\}\}/g, (_, k) => String(parentData[k] ?? ''));
-  // {{../field}} — parent direct access
-  body = body.replace(/\{\{\.\.\/(\w+)\}\}/g, (_, k) => String(parentData[k] ?? ''));
-  // {{field}} — item direct access with fallback to parent data
-  body = body.replace(/\{\{(\w+)\}\}/g, (_, k) => String(item[k] ?? parentData[k] ?? ''));
-  return body;
+  }
+  pushText(src.slice(pos));
+  return root.active;
+}
+
+/** Walk the AST, evaluating conditions/loops and substituting leaf text against ctx */
+function renderNodes(nodes, ctx, widgetId) {
+  let out = '';
+  for (const node of nodes) {
+    if (node.type === 'text') {
+      out += renderText(node.value, ctx, widgetId);
+    } else if (node.type === 'if' || node.type === 'unless') {
+      const branch = node.branches.find(b => {
+        const cond = evalCond(ctx, widgetId, b.cond);
+        return node.type === 'unless' ? !cond : cond;
+      });
+      if (branch) out += renderNodes(branch.children, ctx, widgetId);
+      else if (node.elseChildren) out += renderNodes(node.elseChildren, ctx, widgetId);
+    } else if (node.type === 'each') {
+      const arr = getValue(ctx, node.key.replace(/^_\.data\./, ''), widgetId);
+      if (Array.isArray(arr)) {
+        arr.forEach((item, i) => {
+          out += renderNodes(node.children, { data: item, parent: ctx, index: i }, widgetId);
+        });
+      }
+    }
+  }
+  return out;
 }
 
 /** Replace template expressions with values from the data map */
 function renderTemplate(html, data) {
   const widgetId = 'preview';
-
-  // {{#each field}} and {{#each _.data.field}} — both patterns
-  html = html.replace(
-    /\{\{#each\s+(?:_\.data\.)?(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g,
-    (_, key, body) => {
-      const arr = data[key];
-      if (!Array.isArray(arr) || arr.length === 0) return '';
-      return arr.map((item, i) => renderEachItem(body, item, i, data, widgetId)).join('');
-    }
-  );
-
-  // {{#if field '===' 'value'}} or {{#if field '===' true/false}} — equality
-  html = html.replace(
-    /\{\{#if\s+(\w+)\s+'==='\s+(?:'([^']*)'|(true|false))\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
-    (_, key, quotedVal, boolVal, truthy, falsy = '') => {
-      const actual   = String(data[key] ?? '');
-      const expected = quotedVal !== undefined ? quotedVal : boolVal;
-      return actual === expected ? truthy : falsy;
-    }
-  );
-
-  // {{#if _.data.field}} and {{#if field}} — truthy check
-  html = html.replace(
-    /\{\{#if\s+(?:_\.data\.)?(\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
-    (_, key, truthy, falsy = '') => data[key] ? truthy : falsy
-  );
-
-  // {{_.id}}
-  html = html.replace(/\{\{_\.id\}\}/g, widgetId);
-
-  // {{_.data.field}} — legacy
-  html = html.replace(/\{\{_\.data\.([^}]+)\}\}/g, (_, key) => {
-    const v = data[key.trim()];
-    return v !== undefined ? String(v) : '';
-  });
-
-  // {{field}} — direct access (must be last)
-  html = html.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-    return data[key] !== undefined ? String(data[key]) : '';
-  });
-
-  return html;
+  const ast = parseTemplate(html);
+  return renderNodes(ast, { data, parent: null, index: undefined }, widgetId);
 }
 
-/** Flatten schema into a flat array of settings — handles array + tab at root */
+/** Push a setting, also pulling in its typography-style conditionalSettings (nested sub-fields) */
+function pushSetting(out, item) {
+  out.push(item);
+  for (const cond of (item.typeMeta?.conditionalSettings ?? [])) {
+    for (const s of (cond.settings ?? [])) pushSetting(out, s);
+  }
+}
+
+/** Flatten schema into a flat array of settings — handles array + tab + hidden at root */
 function flattenSettings(schema) {
   const out = [];
   for (const item of (schema ?? [])) {
     if (item.type === 'array') {
       out.push(item); // keep array itself for renderControl
       for (const inner of (item.schema ?? [])) {
-        if (inner.settings) out.push(...inner.settings);
+        if (inner.settings) inner.settings.forEach(s => pushSetting(out, s));
         for (const section of (inner.sections ?? [])) {
-          if (section.settings) out.push(...section.settings);
+          if (section.settings) section.settings.forEach(s => pushSetting(out, s));
         }
       }
     } else if (item.type === 'tab') {
       for (const section of (item.sections ?? [])) {
-        if (section.settings) out.push(...section.settings);
+        if (section.settings) section.settings.forEach(s => pushSetting(out, s));
       }
+    } else if (item.settings) {
+      item.settings.forEach(s => pushSetting(out, s)); // e.g. { type: 'hidden', settings: [...] }
     } else if (item.id) {
-      out.push(item); // direct setting at root level
+      pushSetting(out, item); // direct setting at root level
     }
   }
   return out;
@@ -250,6 +306,27 @@ function renderControl(setting, value) {
         <input type="range" id="${id}" data-id="${esc(setting.id)}"
           value="${esc(val)}" min="${esc(rv.min ?? 0)}"
           max="${esc(rv.max ?? 100)}" step="${esc(rv.step ?? 1)}">
+      </div>`;
+    }
+
+    case 'boxModel': {
+      const v = (val && typeof val === 'object') ? val : {};
+      const side = (s) => `${esc(v[s]?.value ?? '0')}${esc(v[s]?.type ?? 'px')}`;
+      return `<div class="ctrl-row">
+        ${label}
+        <div style="font-size:12px;color:var(--soft);padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;">
+          T:${side('top')} R:${side('right')} B:${side('bottom')} L:${side('left')} — edit <code style="font-size:11px">config.json</code> to modify
+        </div>
+      </div>`;
+    }
+
+    case 'alignment': {
+      const v = (val && typeof val === 'object') ? val : {};
+      return `<div class="ctrl-row">
+        ${label}
+        <div style="font-size:12px;color:var(--soft);padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;">
+          ${esc(v.horizontal ?? '')} / ${esc(v.vertical ?? '')} — edit <code style="font-size:11px">config.json</code> to modify
+        </div>
       </div>`;
     }
 
