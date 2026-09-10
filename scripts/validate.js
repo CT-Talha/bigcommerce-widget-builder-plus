@@ -19,8 +19,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 // ── Valid types from the official BC widget-builder source ───────────────────
+// 'graphQl' (hidden-section only) wires a widget's settings into query.graphql
+// via typeMeta.mappings — see developer.bigcommerce.com/docs/storefront/widgets/guide/graphql-templates.
+// Added for product-slider; not previously used in this repo.
 const VALID_SETTING_TYPES = new Set([
-  'alignment', 'boolean', 'boxModel', 'code', 'color', 'element',
+  'alignment', 'boolean', 'boxModel', 'code', 'color', 'element', 'graphQl',
   'imageManager', 'input', 'number', 'productId', 'productImage',
   'range', 'regexInput', 'select', 'text', 'toggle', 'typography', 'visibility',
 ]);

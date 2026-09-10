@@ -171,6 +171,15 @@ function writeWidget(template, widgetsDir) {
     'utf8'
   );
 
+  // query.graphql — only present when the store's template actually has one
+  if (template.storefront_api_query) {
+    fs.writeFileSync(
+      path.join(widgetDir, 'query.graphql'),
+      template.storefront_api_query,
+      'utf8'
+    );
+  }
+
   // widget.yml — stores UUID so push.js can update the right template
   const yml = [
     `name: "${template.name}"`,

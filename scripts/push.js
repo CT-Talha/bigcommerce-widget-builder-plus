@@ -96,6 +96,7 @@ function readWidget(widgetDir) {
   const ymlPath = path.join(widgetDir, 'widget.yml');
   const htmlPath = path.join(widgetDir, 'widget.html');
   const schemaPath = path.join(widgetDir, 'schema.json');
+  const graphqlPath = path.join(widgetDir, 'query.graphql');
 
   for (const [label, p] of [['widget.yml', ymlPath], ['widget.html', htmlPath], ['schema.json', schemaPath]]) {
     if (!fs.existsSync(p)) {
@@ -107,10 +108,13 @@ function readWidget(widgetDir) {
   const yml = parseWidgetYml(fs.readFileSync(ymlPath, 'utf8'));
   const template = fs.readFileSync(htmlPath, 'utf8');
   const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
+  // query.graphql is optional — only widgets using a 'graphQl' schema field
+  // (e.g. a productId picker) need one. Sent as storefront_api_query.
+  const storefrontApiQuery = fs.existsSync(graphqlPath) ? fs.readFileSync(graphqlPath, 'utf8') : undefined;
 
   // template_uuid is empty for brand-new widgets created with create.js
   // push.js will POST to create them and write the UUID back to widget.yml
-  return { name: yml.name, uuid: yml.template_uuid || '', template, schema, ymlPath };
+  return { name: yml.name, uuid: yml.template_uuid || '', template, schema, storefrontApiQuery, ymlPath };
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +162,9 @@ async function pushWidget(widget) {
     template: widget.template,
     schema: widget.schema,
   };
+  if (widget.storefrontApiQuery !== undefined) {
+    body.storefront_api_query = widget.storefrontApiQuery;
+  }
 
   const res = await fetch(url, {
     method: isNew ? 'POST' : 'PUT',
@@ -188,6 +195,7 @@ async function main() {
 
   console.log(`\nWidget  : ${widget.name}`);
   console.log(`UUID    : ${widget.uuid || '(new — will be assigned by BigCommerce)'}`);
+  console.log(`GraphQL : ${widget.storefrontApiQuery !== undefined ? 'query.graphql found — sending as storefront_api_query' : '(no query.graphql file)'}`);
   console.log(`\n${widget.uuid ? 'Updating' : 'Creating'} widget on BigCommerce...`);
 
   const { data: updated, isNew } = await pushWidget(widget);
