@@ -1,6 +1,6 @@
 {
   "name": "bigcommerce-widget-builder",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "CLI tool to download, preview and push BigCommerce Page Builder widgets",
   "type": "module",
   "bin": {
