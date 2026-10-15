@@ -8,7 +8,7 @@
  *   bigcommerce-widget-builder.zip
  *
  * The zip contains everything a new developer needs:
- *   scripts/, server.js, package.json, README.md
+ *   scripts/, public/, server.js, package.json, README.md
  *
  * Recipients just:
  *   1. Unzip
@@ -27,6 +27,7 @@ const OUT_FILE = path.join(ROOT, 'bigcommerce-widget-builder.zip');
 // Files/folders to include in the zip
 const INCLUDE = [
   { type: 'directory', src: 'scripts',   dest: 'scripts'   },
+  { type: 'directory', src: 'public',    dest: 'public'    },
   { type: 'file',      src: 'server.js', dest: 'server.js' },
   { type: 'file',      src: 'package.json', dest: 'package.json' },
   { type: 'file',      src: 'README.md', dest: 'README.md' },

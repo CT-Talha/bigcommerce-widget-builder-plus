@@ -8,6 +8,7 @@
   },
   "files": [
     "scripts/",
+    "public/",
     "server.js",
     "README.md"
   ],
