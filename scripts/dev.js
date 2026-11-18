@@ -381,7 +381,6 @@ function renderControls(schema, values) {
         for (const section of (inner.sections ?? [])) {
           if (section.label) out += `<div class="section-label">${esc(section.label)}</div>`;
           for (const s of (section.settings ?? [])) {
-            if (s.type === 'imageManager') continue; // image picker — skip in preview
             const val = firstItem[s.id] ?? values[s.id] ?? s.default ?? '';
             out += renderControl(s, val);
           }
@@ -488,14 +487,24 @@ export async function startDev(widgetFolder) {
   /** Called when a control value changes — returns re-rendered widget HTML */
   app.post('/update', (req, res) => {
     const { id, value } = req.body;
-    liveValues[id] = value;
+
+    // imageManager controls are plain URL inputs here, but templates read
+    // {{field.src}} — so keep the value an object instead of a bare string
+    const setting = flattenSettings(getSchema()).find(s => s.id === id);
+    const toStored = (current) => {
+      if (setting?.type !== 'imageManager') return value;
+      const base = (current && typeof current === 'object') ? current : {};
+      return { ...base, src: value, type: base.type ?? 'IMAGE_MANAGER' };
+    };
+
+    liveValues[id] = toStored(liveValues[id]);
     // Also push the updated value into every array item that has this field,
     // so inner-array controls (e.g. per-slide settings) reflect instantly
     for (const arr of Object.values(liveValues)) {
       if (Array.isArray(arr)) {
         for (const item of arr) {
           if (typeof item === 'object' && item !== null && id in item) {
-            item[id] = value;
+            item[id] = toStored(item[id]);
           }
         }
       }
